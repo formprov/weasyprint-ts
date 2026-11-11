@@ -1,24 +1,32 @@
 # weasyprint-ts
 
-A from-scratch TypeScript port of [WeasyPrint 70.0](https://github.com/Kozea/WeasyPrint):
-HTML + CSS in, paginated PDF out, **pixel-exact** against the original. Not a
-wrapper, not a bridge, not a browser with the pixels checked afterwards — every
-stage (CSS parsing → cascade → box tree → layout → shaping → drawing → PDF)
-is ported file-by-file from Python into JavaScript, with no native code: no
-Pango, no HarfBuzz, no FontConfig, no C.
+A TypeScript port of [WeasyPrint 70.0](https://github.com/Kozea/WeasyPrint):
+HTML and CSS in, a paginated PDF out, laid out the way Python WeasyPrint does.
 
-"Pixel-exact" is earned, not asserted. Every commit is measured against the
-real thing — the actual Python WeasyPrint, running in a pinned Linux
-environment — by rendering the same documents side by side and comparing:
+We needed WeasyPrint's paged-media behaviour from Node — real page breaks,
+margin boxes, running headers, tables and text that break where CSS says they
+should — without a Python process and the Pango/HarfBuzz/FontConfig stack
+behind it. The JS ecosystem has two answers today: give the document to
+Chromium (and get Chromium's layout, not WeasyPrint's), or shell out to the
+Python binary (and ship Python with your app). This is a third one: the same
+layout arithmetic, in JavaScript.
 
-- the PDF structure (objects, dictionaries, extracted text, attachments),
-- page geometry and page counts,
-- the rendered pixels at 96 dpi — currently **zero differing pixels**.
+Every stage is ported from the Python source — CSS parsing, the cascade, the
+box tree, layout, text shaping, drawing, the PDF writer — with no native code
+and no subprocess. The runtime dependencies are ordinary JS packages
+(fontkit, linebreak, parse5, fast-png), and the core stays runtime-agnostic,
+so browser and Deno builds are possible.
 
-The corpus comes from upstream's own test suite (3,044 documents: extracts,
-plus captures of what upstream's tests really render), and every commit is
-scored against it. The one known residual (JPEG + `--dpi` draft mode) is
-documented under *Known gaps*.
+"Pixel-exact" is measured, not claimed. Every change is rendered side by side
+with real Python WeasyPrint 70 in a pinned Linux container, then compared on
+PDF structure, page geometry and page counts, and every pixel at 96 dpi. The
+corpus is 3,044 documents from upstream's own test suite (1,135 extracted,
+1,909 captured by running upstream's pytest suite) plus the eight official
+samples. Right now that's zero differing pixels across all of them; the one
+known exception is JPEG downscaled with `--dpi` (see *Known gaps*).
+
+If you need WeasyPrint's output from Node, or you're comparing HTML→PDF
+engines and want a baseline that isn't Chromium, this is for you.
 
 ```
 weasyprint-ts -s style.css flyer.html flyer.pdf
@@ -26,9 +34,8 @@ weasyprint-ts -s style.css flyer.html flyer.pdf
 
 ## Status
 
-Same scoring rules as everywhere else in this project: a case is either
-indistinguishable from the oracle (pixels, PDF structure, page counts) or it
-isn't and it goes to the tracker.
+A case passes only when it is indistinguishable from the oracle: pixels, PDF
+structure, page counts. Anything else goes to the tracker.
 
 | Area | State |
 |---|---|
