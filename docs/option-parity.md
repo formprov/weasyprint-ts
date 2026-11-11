@@ -1,6 +1,6 @@
 # Option / CLI parity with upstream WeasyPrint
 
-Source of truth: `reference_code/WeasyPrint/weasyprint/__main__.py` and `DEFAULT_OPTIONS` in `__init__.py`.
+Source of truth: upstream's `weasyprint/__main__.py` and `DEFAULT_OPTIONS` in `weasyprint/__init__.py` (v70.0).
 `--help` output is byte-identical to upstream (generated from argparse, COLUMNS=80).
 
 | Upstream option | Port status | Notes |

@@ -2,7 +2,7 @@
 
 """Dump the oracle box tree exactly like the parity harness renders (upstream tests.testing_utils.FakeHTML: tests_ua.css
 replaces the UA sheet). Run in the oracle container with the upstream checkout mounted at /upstream, from the cases dir:
-  docker run --rm -v "$PWD:/w:ro" -v <repo>/reference_code/WeasyPrint:/upstream:ro -v <repo>/weasyprint-ts/parity/dump_layout_fake.py:/d.py:ro \
+  docker run --rm -v "$PWD:/w:ro" -v <upstream-checkout>:/upstream:ro -v <repo>/parity/dump_layout_fake.py:/d.py:ro \
     weasy-alpine-prod:latest sh -c "cd /w && /venv/bin/python /d.py /w/CASE.html" > oracle.json
 Compare with tools/layout_dump_ua.ts (port) using parity/cmp_layout.py oracle.json port.json.
 """

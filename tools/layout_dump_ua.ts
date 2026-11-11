@@ -3,7 +3,7 @@
 /**
  * Like layout_dump.ts, but matched to the upstream parity harness: the second argument REPLACES the user-agent
  * stylesheet (pass tests_ua.css, as upstream_diff.py does), and each box also records its text.
- * Run from parity/upstream-cases:  FONT_DIR=../samples-out/oracle-fonts node ../../tools/layout_dump_ua.ts CASE.html tests_ua.css > port.json
+ * Run from parity/upstream-cases:  FONT_DIR=~/.cache/weasy-parity/oracle-fonts node ../../tools/layout_dump_ua.ts CASE.html tests_ua.css > port.json
  * Compare with parity/dump_layout_fake.py (oracle) using parity/cmp_layout.py.
  */
 import '../src/document.ts'; // load order: importing css first throws 'layoutHooks before initialization'

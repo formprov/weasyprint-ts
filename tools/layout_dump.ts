@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
-/** Lay out a document and dump every box (type, tag, page, geometry) as JSON, like harness/dump_layout.py. */
+/** Lay out a document and dump every box (type, tag, page, geometry) as JSON, like parity/dump_layout.py. */
 import '../src/document.ts'; // load order: importing css first throws 'layoutHooks before initialization'
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';

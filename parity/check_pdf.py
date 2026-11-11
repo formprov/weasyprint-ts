@@ -5,7 +5,7 @@
 Compares page count and sizes, annotations, embedded fonts, images per page,
 and extracted text (pdftotext layout mode). Exit 0 when structurally equal.
 
-Usage: python3 harness/check_pdf.py REFERENCE.pdf CANDIDATE.pdf
+Usage: python3 parity/check_pdf.py REFERENCE.pdf CANDIDATE.pdf
 """
 
 import re

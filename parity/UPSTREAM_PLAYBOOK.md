@@ -10,8 +10,8 @@ Every ticket under epic *Upstream oracle parity* points here. Read this file onc
 ## Ground rules (non-negotiable)
 
 1. **Match the oracle, not your idea of correct.** The oracle is the spec. If upstream behaves oddly, so do we.
-2. **Port, don't invent.** Each TS file mirrors an upstream Python file (table in `UPSTREAM.md`; upstream source is
-   `reference_code/WeasyPrint/weasyprint/`). Translate the Python function by function, keep names (snake_case ->
+2. **Port, don't invent.** Each TS file mirrors an upstream Python file (table in `UPSTREAM.md`; the upstream source
+   is `weasyprint/` in a v70.0 checkout). Translate the Python function by function, keep names (snake_case ->
    camelCase), keep order of operations, keep every "TODO" comment. Behavior you can't explain is usually a detail
    you skipped.
 3. **Never change a grader or loosen a threshold to make something pass.** Do not edit `parity/run_samples.py` grading,
@@ -24,15 +24,15 @@ Every ticket under epic *Upstream oracle parity* points here. Read this file onc
 
 ## Environment
 
-All commands run from `weasyprint-ts/` unless stated. Prerequisites already installed on the dev machine: Docker
-(image `weasy-alpine-prod:latest`), Ghostscript (`gs`), qpdf, poppler (`pdftotext`, `pdffonts`), mupdf (`mutool`),
-Node 26, the Python venv at `../.venv` (has Pillow).
+All commands run from `weasyprint-ts/` unless stated. Prerequisites: Docker (image `weasy-alpine-prod:latest`, built
+from `parity/docker/` on first use), Ghostscript (`gs`), qpdf, poppler (`pdftotext`, `pdffonts`), mupdf (`mutool`),
+Node 22.18+, and Python with Pillow. `UPSTREAM_DIR` names the v70.0 checkout the bank generators read.
 
 | What | Command |
 |---|---|
-| Render one file with the port | `FONT_DIR=parity/samples-out/oracle-fonts node src/cli/main.ts in.html out.pdf` |
+| Render one file with the port | `FONT_DIR=~/.cache/weasy-parity/oracle-fonts node src/cli/main.ts in.html out.pdf` |
 | Render one file with the oracle | `docker run --rm -v "$PWD/parity/upstream-cases:/w:ro" -v /tmp:/out weasy-alpine-prod:latest /venv/bin/python -m weasyprint /w/CASE.html /out/CASE_py.pdf` |
-| Extract cases from upstream tests | `python3 parity/extract_upstream.py ../reference_code/WeasyPrint/tests parity/upstream-cases` |
+| Extract cases from upstream tests | `python3 parity/extract_upstream.py "$UPSTREAM_DIR/tests" parity/upstream-cases` |
 | Run cases (summary) | `python3 parity/upstream_diff.py parity/upstream-cases --pattern 'REGEX'` |
 | ... and list failures | add `--list` |
 | Full run + regression guard | `python3 parity/upstream_diff.py parity/upstream-cases --baseline parity/upstream-baseline.json` (exit 1 on regression) |
@@ -52,7 +52,7 @@ upstream's `tests_ua.css` linked as an author stylesheet and its `weasyprint.otf
 
 1. `br show ID`; run the ticket's pattern with `--list` to get the failing set; record counts in a comment.
 2. Pick one failing case. Read its HTML (`parity/upstream-cases/CASE.html`) and the *upstream test* it came from
-   (`reference_code/WeasyPrint/tests/<area>/test_*.py`, find by test name) to learn what it is meant to exercise.
+   (`tests/<area>/test_*.py` in the upstream checkout, find by test name) to learn what it is meant to exercise.
 3. Reproduce, view the diff image, then localize: layout (box positions) vs draw (operators) vs shaping (glyphs).
 4. Find the upstream Python code path; compare with the TS. Fix the *first* divergence, re-run the case. Repeat.
 5. Run the whole ticket pattern, then the full run with `--baseline` (no regressions), then `run_samples.py`

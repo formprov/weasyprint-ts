@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
-/** Dump the box tree (after buildFormattingStructure, before layout), same shape as harness/dump_boxes.py. */
+/** Dump the box tree (after buildFormattingStructure, before layout), same shape as the parity box dumps (`parity/dump_layout.py`). */
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
