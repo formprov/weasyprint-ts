@@ -5,23 +5,23 @@ Write-up for whoever picks this up.
 
 ## What changed (uncommitted)
 
-1. `src/pdf/stream.ts` — `addFont()` keys the document font cache by the Pango
+1. `src/pdf/stream.ts`: `addFont()` keys the document font cache by the Pango
    description string (`pangoDescriptionOf(face, style)`) instead of `face.id`,
    mirroring upstream `get_pango_font_key()` (description hashed with size/gravity
    unset). One face used under two requests yields two embedded subset fonts,
    like the oracle.
-2. Same file — `pangoDescriptionOf()`:
+2. Same file: `pangoDescriptionOf()`:
    - description words come from the matched face's OS/2 attributes, except when
      Pango *synthesizes* bold/oblique, where the whole description is the request
      pattern;
    - **separator rule (new):** `,` after the family when Pango would emit one
      (see "Pango's comma rule" below), via `pangoFamilySeparator()`;
    - **word order (fixed):** weight, style, stretch (was weight, stretch, style).
-3. `src/html_document.ts` — `@font-face` faces are registered with the font
+3. `src/html_document.ts`: `@font-face` faces are registered with the font
    file's real `usWidthClass` (was hardcoded `width: 5`); fontconfig's scan of
    the file sets width, which is where ticket's `Barlow-Condensed,-Condensed`
    style word comes from.
-4. `test/font_naming.test.ts` — new regression tests for the description rule.
+4. `test/font_naming.test.ts`: new regression tests for the description rule.
 
 ## Pango's comma rule (resolved)
 

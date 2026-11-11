@@ -9,7 +9,7 @@ engine by Kozea and contributors.
 * Upstream version ported: 70.0 (source kept in `../WeasyPrint/` in the
   comparison-tool workspace for reference)
 * Upstream license: BSD-3-Clause. This port is distributed under the same
-  BSD-3-Clause license (see `LICENSE`) — the natural choice for a file-by-file
+  BSD-3-Clause license (see `LICENSE`); the natural choice for a file-by-file
   derivative work, and the one upstream's own terms permit with the fewest
   conditions. Files generated from upstream data (for example the user-agent
   stylesheet in `src/css/html5_ua_css.ts`) carry their BSD-3-Clause
@@ -18,7 +18,7 @@ engine by Kozea and contributors.
   "mirrors weasyprint/layout/block.py") to make review and upstream tracking
   easy.
 
-## Pango (LGPL) — not translated
+## Pango (LGPL): not translated
 
 WeasyPrint depends on Pango (LGPL) and HarfBuzz for text layout. Pango C code
 has deliberately NOT been translated into this codebase. The TypeScript text
