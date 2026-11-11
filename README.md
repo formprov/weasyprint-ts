@@ -289,7 +289,9 @@ Greek/Cyrillic marks and GPOS kerning):
 - HarfBuzz's fallback mark positioning for fonts without GPOS
   (`src/text/fallback_marks.ts`), plus GDEF mark zeroing;
 - FontConfig's per-family sort order for missing-glyph fallback, so a serif
-  document picks Times New Roman before Arial exactly like Pango.
+  document picks Times New Roman before Arial exactly like Pango;
+- Pango's synthetic petite/small caps and unicase for faces without
+  `pcap`/`smcp`/`unic`, and the hyphen that Pango counts at a soft hyphen.
 
 The upstream test bank (1130 cases) and the samples stay pixel-identical.
 
