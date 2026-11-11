@@ -60,6 +60,18 @@ export function getSingleKeyword(tokens: readonly Token[]): string | null {
 }
 
 export function getNumber(token: Token, negative = true, integer = false): Dimension | null {
+  if (checkMath(token)) {
+    // Python get_number resolves math and accepts a numeric result (calc(1.5 * 1)).
+    let resolved: any = null;
+    try {
+      resolved = resolveMath(token);
+    } catch (error) {
+      if (error instanceof PercentageInMath || error instanceof RelativeLengthInMath) return null;
+      throw error;
+    }
+    if (resolved === null || resolved.type !== 'number') return null;
+    token = resolved;
+  }
   if (token.type !== 'number') return null;
   if (integer) {
     if (token.isInteger && (negative || token.value >= 0)) return dim(token.value, null);
