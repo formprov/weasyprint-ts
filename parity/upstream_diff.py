@@ -82,6 +82,12 @@ for name in sys.argv[1:]:
             base_url = f"file:///cases/{name}.html"
         elif base_url == '.':
             base_url = "file:///cases/"
+        # FakeHTML renders every document with the module-level TEST_UA_FONT_CONFIG,
+        # whose strut cache is keyed by str(style['line_height']); every math
+        # line-height stringifies to the same key, so a later case would reuse an
+        # earlier case's strut. Clear the per-document caches between cases.
+        from tests.testing_utils import TEST_UA_FONT_CONFIG
+        TEST_UA_FONT_CONFIG.strut_layouts.clear()
         FakeHTML(
             string=open(f"/cases/{name}.html", encoding="utf-8").read(), base_url=base_url,
             media_type=opts.get('media_type', 'print')).write_pdf(
