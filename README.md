@@ -293,7 +293,14 @@ Greek/Cyrillic marks and GPOS kerning):
 - Pango's synthetic petite/small caps and unicase for faces without
   `pcap`/`smcp`/`unic`, and the hyphen that Pango counts at a soft hyphen.
 
-The upstream test bank (1130 cases) and the samples stay pixel-identical.
+The only known behavioural difference left is JPEG + `--dpi`: Pillow asks
+libjpeg for a DCT-scaled decode (draft mode) before resizing, and the port
+decodes at full resolution and box-reduces. The result is a slightly
+different resample on downscaled JPEGs (sizes and colours match); every
+other raster format is byte-exact. Tracked in `weasy-vej`.
+
+The upstream test bank (static 1130 cases, dynamic 1909 cases) and the
+samples stay pixel-identical.
 
 ## Contributing
 
