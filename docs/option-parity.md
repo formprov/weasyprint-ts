@@ -22,7 +22,7 @@ Source of truth: `reference_code/WeasyPrint/weasyprint/__main__.py` and `DEFAULT
 | `-p/--presentational-hints` | ok | |
 | `--optimize-images` | ok | |
 | `-j/--jpeg-quality` | ok | |
-| `-D/--dpi` | ok (PNG/GIF/BMP/TIFF/WebP and RGBA/LA byte-exact vs oracle; JPEG sizes exact, pixels differ slightly because Pillow's draft-mode DCT-scaled decode is not reproduced — tracked in weasy-vej) | |
+| `-D/--dpi` | ok (PNG/GIF/BMP/TIFF/WebP and RGBA/LA byte-exact vs oracle; JPEG sizes exact, pixels differ slightly because Pillow's draft-mode DCT-scaled decode is not reproduced; tracked in weasy-vej) | |
 | `--full-fonts` | ok | |
 | `--hinting` | accepted, no effect | |
 | `-c/--cache-folder` | accepted, no effect | output-neutral |
@@ -53,6 +53,6 @@ Compared `weasyprint/__init__.py` and `document.py` with `src/index.ts`, `src/do
 | `render(counter_style, color_profiles)` arguments | not exposed |
 | `PDF forms`, `dpi`, `xmp_metadata`, `attachment_relationships` write options | xmp/relationships: CLI only; dpi/forms: see tickets weasy-0yb, weasy-ao3 |
 
-Suggested follow-up for the missing rows: one ticket "API shortcuts: HTML.render/writePdf, Document.copy, Attachment, DEFAULT_OPTIONS" — done 2026-11-09 (weasy-aa2).
+Suggested follow-up for the missing rows: one ticket "API shortcuts: HTML.render/writePdf, Document.copy, Attachment, DEFAULT_OPTIONS"; done 2026-11-09 (weasy-aa2).
 
-`parity/api_cli_parity.md` was retired 2026-11-09 (ticket weasy-1lk): it duplicated — and had drifted from — this table, which is the single source of truth.
+`parity/api_cli_parity.md` was retired 2026-11-09 (ticket weasy-1lk): it duplicated this table and had drifted from it. This table is the single source of truth.

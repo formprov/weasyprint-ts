@@ -3,28 +3,28 @@
 A TypeScript port of [WeasyPrint 70.0](https://github.com/Kozea/WeasyPrint):
 HTML and CSS in, a paginated PDF out, laid out the way Python WeasyPrint does.
 
-We needed WeasyPrint's paged-media behaviour from Node — real page breaks,
-margin boxes, running headers, tables and text that break where CSS says they
-should — without a Python process and the Pango/HarfBuzz/FontConfig stack
-behind it. The JS ecosystem offers two routes today: run the document
-through Chromium, which means loading a full browser engine to produce a PDF
-and accepting its layout instead of WeasyPrint's; or call the Python binary,
-which means shipping Python with your app. Both are heavy dependencies for
-the job. This is a third route: the same layout arithmetic, in JavaScript.
+We needed WeasyPrint's paged-media behaviour from Node: real page breaks,
+margin boxes, running headers, and tables and text that break where CSS says
+they should. We also needed it without a Python process and the
+Pango/HarfBuzz/FontConfig stack behind it. The JS ecosystem offers two routes
+today. One runs the document through Chromium, which means loading a full
+browser engine to produce a PDF and accepting Chromium's layout instead of
+WeasyPrint's. The other calls the Python binary, which means shipping Python
+with your app. Both are heavy dependencies for the job. This is a third
+route: the same layout arithmetic, in JavaScript.
 
-Every stage is ported from the Python source — CSS parsing, the cascade, the
-box tree, layout, text shaping, drawing, the PDF writer — with no native code
-and no subprocess. The runtime dependencies are ordinary JS packages
+Every stage is ported from the Python source: CSS parsing, the cascade, the
+box tree, layout, text shaping, drawing, the PDF writer. There is no native
+code and no subprocess. The runtime dependencies are ordinary JS packages
 (fontkit, linebreak, parse5, fast-png), and the core stays runtime-agnostic,
 so browser and Deno builds are possible.
 
-"Pixel-exact" is measured, not claimed. Every change is rendered side by side
-with real Python WeasyPrint 70 in a pinned Linux container, then compared on
-PDF structure, page geometry and page counts, and every pixel at 96 dpi. The
-corpus is 3,044 documents from upstream's own test suite (1,135 extracted,
-1,909 captured by running upstream's pytest suite) plus the eight official
-samples. Right now that's zero differing pixels across all of them; the one
-known exception is JPEG downscaled with `--dpi` (see *Known gaps*).
+Parity is measured on every change: both engines render the same documents,
+and we compare PDF structure, page geometry, page counts and every pixel at
+96 dpi. The corpus is 3,044 documents from upstream's own test suite (1,135
+extracted, 1,909 captured by running upstream's pytest suite) plus the eight
+official samples. Right now that is zero differing pixels across all of them.
+The one known exception is JPEG downscaled with `--dpi` (see *Known gaps*).
 
 If you need WeasyPrint's output from Node, or you're comparing HTML→PDF
 engines and want a baseline that isn't Chromium, this is for you.
@@ -128,12 +128,12 @@ Fonts resolve like this:
 
 A parsed font index is cached per directory in
 `.weasyprint-ts-font-index.json` (mtime/size-validated) to keep startup fast.
-Font files are never bundled or redistributed — see `NOTICE.md`.
+Font files are never bundled or redistributed; see `NOTICE.md`.
 
 ## Architecture
 
 Modules mirror upstream file-by-file (each docstring names the file it
-mirrors, e.g. `mirrors weasyprint/layout/block.py` — see `UPSTREAM.md`):
+mirrors, e.g. `mirrors weasyprint/layout/block.py`; see `UPSTREAM.md`):
 
 ```
 src/
@@ -150,7 +150,7 @@ src/
 Design rules, enforced where practical:
 
 - **Runtime-agnostic core**: `src/` outside `src/cli/` must not import
-  `node:*` (or use Node globals) — all IO goes through the `Fetcher`,
+  `node:*` (or use Node globals). All IO goes through the `Fetcher`,
   `FontSource` and log-sink interfaces. Enforced by
   `test/runtime_agnostic.test.ts`. This keeps browser/Deno builds possible.
 - **Synchronous core**, like upstream: async IO is prefetched, then layout
@@ -183,16 +183,16 @@ synthetic caps); the seam stays open for alternative backends.
 ## Comparing against WeasyPrint on your own documents
 
 Every document below was rendered by **Python WeasyPrint (left)** and
-**weasyprint-ts (right)** — the same input, zero differing pixels:
+**weasyprint-ts (right)**: the same input, zero differing pixels:
 
 <p>
   <img src="examples/flyer-comparison/flyer/python-1.png" width="49%" alt="WeasyPrint render">
   <img src="examples/flyer-comparison/flyer/typescript-1.png" width="49%" alt="weasyprint-ts render">
 </p>
-<p><sub>From <code>examples/flyer.html</code> — the generated comparison with full-resolution
+<p><sub>From <code>examples/flyer.html</code>. The generated comparison with full-resolution
 images lives in <code>examples/flyer-comparison/</code>.</sub></p>
 
-The `parity/` directory is a self-contained comparison harness — run it on
+The `parity/` directory is a self-contained comparison harness. Run it on
 your own documents:
 
 ```sh
@@ -221,7 +221,7 @@ node tools/box_dump.ts in.html            # dump the pre-layout box tree
 
 ## What "matching WeasyPrint" takes, concretely
 
-This section is the short version of `parity/UPSTREAM_PLAYBOOK.md` — worth 10
+This section is the short version of `parity/UPSTREAM_PLAYBOOK.md`. It is worth 10
 minutes if you want to see what day-to-day parity work is made of:
 
 - **The oracle.** Every comparison renders the document twice: once with
@@ -239,10 +239,10 @@ minutes if you want to see what day-to-day parity work is made of:
   attachments, embedded-file checksums/dates), and extracted text.
 - **The corpus.** Static extracts (upstream's input strings) plus dynamic
   captures: upstream's pytest suite runs *inside* the container with a shim
-  that records the actual HTML and the per-case options — so the comparison
+  that records the actual HTML and the per-case options, so the comparison
   starts from exactly what upstream renders, not from a re-writing of it.
 - **Probing.** When engines disagree, the oracle gets interrogated: fc-match
-  under the pinned fontconfig, Pango/Cairo flags, font-table dumps — the
+  under the pinned fontconfig, Pango/Cairo flags, font-table dumps. The
   replication has to match the *behavior*, whatever the internal reason
   (many of the fixes in this repo reproduce upstream quirks like
   float-vs-int coordinate formatting in PDF streams).
@@ -315,18 +315,18 @@ samples stay pixel-identical.
 
 ## Contributing
 
-Contributions welcome — code, tests, and parity reports (documents that
+Contributions welcome: code, tests, and parity reports (documents that
 render differently are gold; open an issue with the HTML + expected output).
 
 Ground rules:
 
 1. **Parity is the spec.** When in doubt, check what WeasyPrint 70 does
-   (`UPSTREAM.md` tracks the upstream checkout) and replicate the behavior —
+   (`UPSTREAM.md` tracks the upstream checkout) and replicate the behavior,
    including its bugs. If upstream changes behavior in a newer version,
    that's a versioned change, not a fix.
-2. **Keep the core runtime-agnostic** — no `node:*` imports outside
+2. **Keep the core runtime-agnostic**: no `node:*` imports outside
    `src/cli/`; the test suite enforces it.
-3. **Keep modules mirroring upstream** — one docstring line naming the
+3. **Keep modules mirroring upstream**: one docstring line naming the
    upstream file per module; behavior changes reference upstream commits.
 4. **Tests**: `npx tsc --noEmit` and `npm test` must pass; layout changes
    should include a document that exercises them (the comparison harness
@@ -338,21 +338,21 @@ Ground rules:
 Everything in the JS/TS ecosystem that claims HTML→PDF falls into three
 families, and none of them contains WeasyPrint's layout arithmetic.
 
-**Family 1 — Python wrappers.** The packages named after WeasyPrint on npm
+**Family 1: Python wrappers.** The packages named after WeasyPrint on npm
 (`weasyprint`, `node-weasyprint`, `weasyprint-wrapper`, `htmltopdf-weasyprint`)
 spawn the Python `weasyprint` binary as a subprocess and stream your HTML to
 it. All rendering lives in the Python process; the JS side is process
 management. They work exactly like whatever WeasyPrint their deployment
-provides — which is also their limit: every machine that runs your code needs
+provides, which is also their limit: every machine that runs your code needs
 Python, WeasyPrint, Pango, HarfBuzz and FontConfig installed, every document
 pays the interpreter startup, and nothing can be embedded, extended, or
 inspected from JavaScript. If you already operate Python WeasyPrint and only
 want a Node API around it, they are a reasonable choice.
 
-**Family 2 — browser rendering.** Puppeteer/Playwright (`page.pdf()`),
+**Family 2: browser rendering.** Puppeteer/Playwright (`page.pdf()`),
 Paged.js, `react-to-print`/`window.print()`, and the hosted APIs (pdfshift,
-api2pdf, …) all hand your HTML to Chromium. That is the *entire* set of true
-HTML renderers in JS/TS: it is one engine, and it is not WeasyPrint. We
+api2pdf, …) all hand your HTML to Chromium. That is the whole set of real HTML
+renderers in JS/TS: one engine, and not WeasyPrint. We
 measured both variants on the comparison corpus (same pinned production
 fonts) with the raster-compare harness:
 
@@ -371,31 +371,31 @@ The residual for Chromium/Paged.js is structural, not cosmetic: line-box
 rounding, table auto-layout distribution, flex heights, and page
 fragmentation all differ, so long documents even paginate to a different
 page count (3 vs 4 on the multipage corpus document). Paged.js also honors
-`@page :not(:first)`, which WeasyPrint 70 ignores — a document that depends
+`@page :not(:first)`, which WeasyPrint 70 ignores, so a document that depends
 on that quirk cannot render identically in a spec-correct engine.
 
-**Family 3 — libraries whose "HTML→PDF" doesn't run an HTML layout engine:**
+**Family 3: libraries whose "HTML→PDF" doesn't run an HTML layout engine:**
 
 | Library | What it actually does | Verdict for WeasyPrint-parity |
 |---|---|---|
 | jsPDF (`.html()`) | Drives html2canvas's DOM walk through its own canvas shim, emitting drawing commands. An approximation of a rendering pass: no z-order, partial CSS, version-dependent text handling | ❌ no layout engine |
-| html2pdf.js | html2canvas + jsPDF — genuine raster screenshots | ❌ image of the page, no text |
-| pdfmake | Its own JSON document DSL on PDFKit — you rewrite your generator to target it | ❌ not HTML |
+| html2pdf.js | html2canvas + jsPDF: genuine raster screenshots | ❌ image of the page, no text |
+| pdfmake | Its own JSON document DSL on PDFKit; you rewrite your generator to target it | ❌ not HTML |
 | PDFKit | Programmatic drawing API (fontkit-based) | ❌ no HTML |
 | @react-pdf/renderer | React components → Yoga flexbox, no CSS cascade | ❌ not HTML |
 | pdf-lib | Editor for existing PDFs (merge/forms/stamp) | ❌ different problem |
 | Nutrient (PSPDFKit) | Commercial viewer/editor SDK | ❌ different problem + license |
 
-The pattern: Family 1 requires the Python stack on every machine; Family 2 is
-one engine (Chromium) that computes layout differently by design —
-spec-correct where WeasyPrint is quirky; Family 3 assumes the layout problem
-away by having *you* compute positions. Pixel-parity with WeasyPrint
-therefore requires WeasyPrint's own layout arithmetic, which exists in
-exactly one place: WeasyPrint. This port is that arithmetic, in TypeScript.
+Family 1 needs the Python stack on every machine. Family 2 is one engine
+that computes layout differently by design: spec-correct where WeasyPrint is
+quirky. Family 3 assumes the layout problem away by having you compute
+positions. Matching WeasyPrint therefore
+requires WeasyPrint's own layout arithmetic, which exists in one place:
+WeasyPrint. This project is that arithmetic, in TypeScript.
 
 ## License
 
-This port is BSD-3-Clause — see `LICENSE` — the same license upstream
+This port is BSD-3-Clause; see `LICENSE`. It is the same license upstream
 WeasyPrint itself uses; its attribution is preserved in `NOTICE.md`. No
 LGPL/Pango code is translated: the text stack is a clean-room
 reimplementation from documented behaviour, verified pixel-identical on the

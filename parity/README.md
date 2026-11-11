@@ -1,16 +1,16 @@
 # Parity tooling
 
 Compare this port against Python WeasyPrint on your own documents, or on the
-repo's corpus — down to the pixel.
+repo's corpus, down to the pixel.
 
 ## Prerequisites
 
-- **Python WeasyPrint 70** (`pip install weasyprint==70.0`) — the reference
+- **Python WeasyPrint 70** (`pip install weasyprint==70.0`), the reference
   engine. For the *pinned production* environment, use the Docker images in
   `docker/` (they fix Pango/HarfBuzz/FontConfig and the font set).
-- **Ghostscript** — rasterizes both PDFs for the pixel comparison.
-- **qpdf** — page counts.
-- Node 26+ — runs this port directly.
+- **Ghostscript**: rasterizes both PDFs for the pixel comparison.
+- **qpdf**: page counts.
+- **Node 26+**: runs this port directly.
 
 ## The corpus
 
@@ -32,8 +32,8 @@ markdown report with the first divergence per failing document.
 Both engines are pinned to byte-identical font files so glyphs never drift:
 the corpus's own `fonts/` when it ships one, otherwise the pinned image's
 font set (extracted on demand to `~/.cache/weasy-parity/oracle-fonts`, keyed
-by the image id). An unpinned fallback — e.g. a host with no plain
-"Noto Serif" — fabricates pixel diffs entirely from font resolution. Opt out
+by the image id). An unpinned fallback (for example a host with no plain
+"Noto Serif") fabricates pixel diffs entirely from font resolution. Opt out
 with `--no-font-pin`.
 
 For a corpus with its own fonts, diffrun mounts the font directory and a
@@ -48,12 +48,12 @@ local fonts use the image's own font set on both sides, so the port keeps
 
 Useful flags:
 
-- `--stylesheet style.css` — user stylesheet passed to both engines
-- `--python-cmd 'python3 -m weasyprint'` — how to invoke Python WeasyPrint
+- `--stylesheet style.css`: user stylesheet passed to both engines
+- `--python-cmd 'python3 -m weasyprint'`: how to invoke Python WeasyPrint
   (default: `weasyprint` on PATH)
-- `--docker` — render the Python side inside the pinned production image
+- `--docker`: render the Python side inside the pinned production image
   (build it first: `docker build -t weasy-alpine-prod -f parity/docker/alpine-prod-Dockerfile .`)
-- `--limit N` — first N documents only
+- `--limit N`: first N documents only
 
 ## The acceptance page
 
@@ -61,8 +61,8 @@ Useful flags:
 python3 parity/acceptance.py            # 8 official samples + test/corpus, side by side
 ```
 
-Builds one `parity/acceptance-out/index.html` with two groups — the official
-WeasyPrint samples and this repo's own corpus — each document showing the
+Builds one `parity/acceptance-out/index.html` with two groups: the official
+WeasyPrint samples and this repo's own corpus, each document showing the
 Python WeasyPrint render next to the port's, page by page, with a
 pixel-parity badge. The samples use the pinned image's fonts for both
 engines; the corpus pins `test/fonts` for both. This is the human acceptance
