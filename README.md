@@ -226,7 +226,7 @@ minutes if you want to see what day-to-day parity work is made of:
   scores the upstream banks. `parity/pdf_struct_diff.py` compares PDF objects
   item by item. `parity/side_by_side.py` gives a human view for any document.
 - **What gets compared**, for every case: page count, page size, the laid-out
-  box tree (up to 1% coordinate tolerance in the layout diff, 0 in pixels),
+  box tree (0.01 px coordinate tolerance in the layout diff, 0 in pixels),
   every 96-dpi pixel, PDF object dictionaries (metadata, links, bookmarks,
   attachments, embedded-file checksums/dates), and extracted text.
 - **The corpus.** Static extracts (upstream's input strings) plus dynamic
