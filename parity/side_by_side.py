@@ -10,6 +10,14 @@ rasterization, qpdf for page counts.
 Usage:
   python3 parity/side_by_side.py DOC.html [-s style.css] [-o OUT_DIR] [--python-cmd CMD]
   python3 parity/side_by_side.py DOCS_DIR/ [-s style.css] [-o OUT_DIR]
+  python3 parity/side_by_side.py DOC.html --pagedjs     # add the Paged.js contender column
+
+--pagedjs renders the document a third time with harness/render_pagedjs.mjs (the
+Paged.js polyfill in headless Chromium) and shows it beside the two WeasyPrint
+engines. Its badge is informational: WeasyPrint parity is still decided by the
+TS column. The runner needs harness/node_modules (pagedjs, playwright-core) and a
+Playwright Chromium build (override with CHROMIUM_PATH); set CALIBRATE=<oracle
+dump> for the oracle-calibrated variant described in the README score table.
 """
 
 import argparse
@@ -66,18 +74,44 @@ def render_ts(doc: Path, out: Path, args, env) -> subprocess.CompletedProcess:
     return run(cmd + [str(doc), str(out)], env=env)
 
 
+def render_pagedjs(doc: Path, out: Path, args, env) -> subprocess.CompletedProcess:
+    """Third contender: the Paged.js polyfill in headless Chromium.
+
+    Runs harness/render_pagedjs.mjs (see the module comment there: font pinning,
+    the WeasyPrint-70 quirk shims and the optional CALIBRATE=oracle-dump loop).
+    The runner needs harness/node_modules (pagedjs, playwright-core) and a
+    Chromium build; a failure is reported but never fails the TS comparison.
+    """
+    runner = Path(args.pagedjs_runner).resolve()
+    cmd = ['node', str(runner)]
+    if args.stylesheet:
+        cmd += ['-s', str(Path(args.stylesheet).resolve())]
+    return run(cmd + [str(doc), str(out)], env=env, cwd=runner.parent)
+
+
 def to_png(pdf: Path, png: str) -> None:
     subprocess.run(['gs', '-q', '-dNOPAUSE', '-dBATCH', '-sDEVICE=png16m', '-r110',
                     '-dTextAlphaBits=4', '-dGraphicsAlphaBits=4', f'-sOutputFile={png}', str(pdf)],
                    capture_output=True, check=False)
 
 
-def page_diff(py_pdf: Path, ts_pdf: Path) -> str:
-    r = run([sys.executable, str(Path(__file__).parent / 'cmp_pdf.py'), str(py_pdf), str(ts_pdf)])
-    line = next((l.strip() for l in r.stdout.splitlines() if 'differing pixels' in l), None)
-    if line and 'differing pixels 0 (0.000%)' in line:
+def page_diff(a: Path, b: Path) -> str:
+    """Rasterize two PDFs and return a badge. Identical means equal page counts and
+    zero differing pixels on every page."""
+    r = run([sys.executable, str(Path(__file__).parent / 'cmp_pdf.py'), str(a), str(b)])
+    lines = [line.strip() for line in r.stdout.splitlines() if line.strip()]
+    pages = next((line for line in lines if line.startswith('pages ')), 'pages ? ?')
+    counts = pages.split()[1:]
+    diffs = [line for line in lines if 'differing pixels' in line]
+    identical = (len(counts) == 2 and counts[0] == counts[1] and diffs and
+                 len(diffs) == int(counts[0]) and
+                 all('differing pixels 0 (0.000%)' in line for line in diffs))
+    if identical:
         return '✅ pixel-identical'
-    return '❌ ' + (line or 'comparison failed')
+    if len(counts) == 2 and counts[0] != counts[1]:
+        return f'❌ page count {counts[0]} vs {counts[1]}'
+    return '❌ ' + (diffs[0] if diffs else next(
+        (line for line in lines if not line.startswith('pages ')), 'comparison failed'))
 
 
 def main():
@@ -86,6 +120,10 @@ def main():
     ap.add_argument('-s', '--stylesheet', default=None)
     ap.add_argument('-o', '--out', default=None)
     ap.add_argument('--python-cmd', default='weasyprint')
+    ap.add_argument('--pagedjs', action='store_true',
+                    help='add the Paged.js contender column (Chromium via harness/render_pagedjs.mjs)')
+    ap.add_argument('--pagedjs-runner', default=str(REPO.parent / 'harness' / 'render_pagedjs.mjs'),
+                    help='Paged.js runner script (default: harness/render_pagedjs.mjs)')
     args = ap.parse_args()
 
     src = Path(args.input).resolve()
@@ -113,7 +151,7 @@ def main():
         if pr.returncode or tr.returncode:
             detail = ('python: ' + (pr.stderr.strip().splitlines()[-1] if pr.stderr else '?') + ' | ' if pr.returncode else '') + \
                      ('ts: ' + (tr.stderr.strip().splitlines()[-1] if tr.stderr else '?') if tr.returncode else '')
-            sections.append((doc.name, '', [('error', detail)], d, []))
+            sections.append((doc.name, '❌ ' + detail, None, [], d, []))
             failures += 1
             continue
         badge = page_diff(d / 'python.pdf', d / 'typescript.pdf')
@@ -121,12 +159,26 @@ def main():
             failures += 1
         to_png(d / 'python.pdf', str(d / 'python-%d.png'))
         to_png(d / 'typescript.pdf', str(d / 'typescript-%d.png'))
+
+        # Optional third column: Paged.js in Chromium. Informational only — the TS badge above
+        # is what decides pass/fail.
+        pj_badge = None
+        if args.pagedjs:
+            pj = render_pagedjs(doc, d / 'pagedjs.pdf', args, env)
+            if pj.returncode:
+                pj_badge = '❌ Paged.js failed: ' + (pj.stderr.strip().splitlines()[-1] if pj.stderr else f'exit {pj.returncode}')
+            else:
+                pj_badge = page_diff(d / 'python.pdf', d / 'pagedjs.pdf')
+                to_png(d / 'pagedjs.pdf', str(d / 'pagedjs-%d.png'))
+
         n_py = len(list(d.glob('python-*.png')))
         n_ts = len(list(d.glob('typescript-*.png')))
-        pages = [(f'page {i}', f'python-{i}.png', f'typescript-{i}.png')
-                 for i in range(1, max(n_py, n_ts) + 1)]
-        sections.append((doc.name, badge, pages, d, []))
-        print(f'{doc.name}: {badge}')
+        n_pj = len(list(d.glob('pagedjs-*.png')))
+        pages = [(f'page {i}', f'python-{i}.png', f'typescript-{i}.png',
+                  f'pagedjs-{i}.png' if i <= n_pj else None)
+                 for i in range(1, max(n_py, n_ts, n_pj) + 1)]
+        sections.append((doc.name, badge, pj_badge, pages, d, []))
+        print(f'{doc.name}: {badge}' + (f' | Paged.js: {pj_badge}' if pj_badge else ''))
 
     ts = datetime.datetime.now().isoformat(timespec='seconds')
     html = ['''<!doctype html><html><head><meta charset="utf-8"><title>WeasyPrint vs weasyprint-ts</title>
@@ -148,17 +200,28 @@ label { font-size: 12px; color: #aaa; display: block; margin-top: 3px; }
 </style></head><body>
 <h1>WeasyPrint (Python) vs weasyprint-ts</h1>
 <p class="hint">Click any image for the full-resolution render, then use the browser zoom for detail.</p>''']
-    for name, badge, pages, d, _ in sections:
+    if args.pagedjs:
+        html[0] = html[0].replace('vs weasyprint-ts</h1>', 'vs weasyprint-ts vs Paged.js</h1>')
+    for name, badge, pj_badge, pages, d, _ in sections:
         stem = d.name
         cls = 'ok' if badge.startswith('✅') else 'bad'
         html.append(f'<section class="sample"><h2>{name}</h2><span class="badge {cls}">{badge}</span>')
+        if pj_badge:
+            pj_cls = 'ok' if pj_badge.startswith('✅') else 'bad'
+            html.append(f' <span class="badge {pj_cls}">Paged.js: {pj_badge}</span>')
         html.append(f'<nav class="pdf-links"><a href="{stem}/python.pdf" target="_blank" rel="noopener">Open WeasyPrint (Python, pinned image) PDF</a>'
-                    f'<a href="{stem}/typescript.pdf" target="_blank" rel="noopener">Open weasyprint-ts PDF</a></nav>')
-        for page_label, py_img, ts_img in pages:
-            html.append(f'<div class="pair">'
-                        f'<div><a href="{stem}/{py_img}" target="_blank" rel="noopener"><img src="{stem}/{py_img}"></a><label>WeasyPrint — {page_label}</label></div>'
-                        f'<div><a href="{stem}/{ts_img}" target="_blank" rel="noopener"><img src="{stem}/{ts_img}"></a><label>weasyprint-ts — {page_label}</label></div>'
-                        f'</div>')
+                    f'<a href="{stem}/typescript.pdf" target="_blank" rel="noopener">Open weasyprint-ts PDF</a>')
+        if pj_badge and (d / 'pagedjs.pdf').exists():
+            html.append(f'<a href="{stem}/pagedjs.pdf" target="_blank" rel="noopener">Open Paged.js PDF</a>')
+        html.append('</nav>')
+        for page_label, py_img, ts_img, pj_img in pages:
+            cells = [
+                f'<div><a href="{stem}/{py_img}" target="_blank" rel="noopener"><img src="{stem}/{py_img}"></a><label>WeasyPrint — {page_label}</label></div>',
+                f'<div><a href="{stem}/{ts_img}" target="_blank" rel="noopener"><img src="{stem}/{ts_img}"></a><label>weasyprint-ts — {page_label}</label></div>',
+            ]
+            if pj_img:
+                cells.append(f'<div><a href="{stem}/{pj_img}" target="_blank" rel="noopener"><img src="{stem}/{pj_img}"></a><label>Paged.js — {page_label}</label></div>')
+            html.append(f'<div class="pair">{"".join(cells)}</div>')
         html.append('</section>')
     html.append(f'<p class="hint">Generated {ts} by parity/side_by_side.py</p>')
     html.append('</body></html>')
