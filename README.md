@@ -106,7 +106,7 @@ writeFileSync('even.pdf', subset.writePdf());
 ```
 
 TypeScript users get full declarations (`.d.ts` shipped), including the
-`TextEngine` seam and the styled-property accessors.
+`TextEngine` seam and every option/type used above.
 
 ### Fonts
 
