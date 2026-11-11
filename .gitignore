@@ -1,0 +1,16 @@
+node_modules/
+*.tsbuildinfo
+sbs-*/
+accept_report.md
+dist/
+*.tgz
+parity/samples-out/
+__pycache__/
+parity/upstream-out/
+parity/pdfstruct-out/
+parity/xcr-tmp/
+parity/experiments/
+.scratch/
+parity/acceptance-out/
+parity/pagedjs/node_modules/
+.weasyprint-ts-font-index.json
