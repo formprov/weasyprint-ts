@@ -1,70 +1,84 @@
-"""Generate the JPEG codec fixtures with the oracle's Pillow (run inside weasy-alpine-prod).
+"""Generate the committed JPEG codec fixtures from the parity corpus.
 
-For each case: a deterministic RGB source (raw bytes), the Pillow JPEG encoding at quality 75 (baseline and
-progressive), and Pillow's decode of that JPEG (raw RGB). test/jpeg.test.ts checks the port against them.
+Reuses the deterministic corpus and the oracle in ``parity/jpeg_parity.py``
+(Pillow inside the pinned ``weasy-alpine-prod`` image, the exact library the
+Python WeasyPrint uses). For every case we write:
 
-  docker run --rm -v "$PWD/parity:/p:ro" -v "$PWD/test/fixtures/jpeg:/out" weasy-alpine-prod:latest \
-      /venv/bin/python /p/gen_jpeg_fixtures.py
+* ``<name>.jpg``          - the input file
+* ``<name>.raw``          - Pillow's decoded samples (mode L / RGB / CMYK)
+* ``<name>.resaved.jpg``  - Pillow's re-save when upstream would re-save it
+* ``fixtures.json``       - the manifest ``test/jpeg.test.ts`` iterates
+
+The two 1000x1415 cases (multi-megabyte raw pixels) stay in the development
+harness: they do not cover a layout the smaller cases miss.
+
+  cd weasyprint-ts
+  docker run --rm -v "$PWD/parity:/p:ro" -v "$PWD/test/fixtures/jpeg:/out" \\
+      weasy-alpine-prod:latest /venv/bin/python /p/gen_jpeg_fixtures.py
 """
 import io
 import json
-import math
+import os
 
-from PIL import Image
+from jpeg_parity import case_bytes, cases
 
-CASES = [
-    # name, width, height, progressive
-    ('baseline-420-17x33', 17, 33, False),
-    ('progressive-420-40x24', 40, 24, True),
-    ('baseline-edge-65x41', 65, 41, False),
-]
+OUT = '/out'
+SKIP = ('large',)
 
 
-def source(width, height):
-    data = bytearray()
-    for y in range(height):
-        for x in range(width):
-            data += bytes((
-                (x * 255 // max(width - 1, 1)) & 255,
-                (y * 255 // max(height - 1, 1)) & 255,
-                (int(127 + 127 * math.sin((x + y) / 7.0))) & 255,
-            ))
-    return bytes(data)
+def main():
+    from PIL import Image, ImageOps
+
+    os.makedirs(OUT, exist_ok=True)
+    manifest = []
+    for case in cases():
+        name = case['name']
+        if any(part in name for part in SKIP):
+            continue
+        data = case_bytes(case)
+        if case.get('truncate'):
+            data = data[:int(len(data) * case['truncate'])]
+        if case.get('truncate_tail'):
+            data = data[:-case['truncate_tail']]
+        with open(os.path.join(OUT, name + '.jpg'), 'wb') as handle:
+            handle.write(data)
+
+        entry = {'name': name, 'file': name + '.jpg', 'resave': False}
+        try:
+            image = Image.open(io.BytesIO(data))
+        except Exception as error:  # noqa: BLE001 - Pillow's rejection is the expected result
+            entry.update(error=f'open: {type(error).__name__}: {error}', drop=True)
+            manifest.append(entry)
+            continue
+        try:
+            image.load()
+            pixels = image.tobytes()
+        except Exception as error:  # noqa: BLE001
+            # Header parses but the stream is broken (truncation). Upstream only touches the
+            # pixels when re-saving, so it drops the image just for the EXIF/quality cases.
+            entry.update(error=f'load: {type(error).__name__}: {error}',
+                         drop='exif' in image.info)
+            manifest.append(entry)
+            continue
+
+        entry.update(width=image.width, height=image.height, mode=image.mode,
+                     channels={'L': 1, 'RGB': 3, 'CMYK': 4}[image.mode])
+        entry['decoded'] = name + '.raw'
+        with open(os.path.join(OUT, entry['decoded']), 'wb') as handle:
+            handle.write(pixels)
+        if case['kind'] == 'pillow' and ('exif' in case['save'] or 'orientation' in case['save']):
+            entry['resave'] = True
+            buf = io.BytesIO()
+            ImageOps.exif_transpose(image).save(buf, format='JPEG', quality=75)
+            entry['resaved'] = name + '.resaved.jpg'
+            with open(os.path.join(OUT, entry['resaved']), 'wb') as handle:
+                handle.write(buf.getvalue())
+        manifest.append(entry)
+
+    with open(os.path.join(OUT, 'fixtures.json'), 'w') as handle:
+        json.dump(manifest, handle, indent=1)
+    print(f'{len(manifest)} fixtures in {OUT}')
 
 
-for name, width, height, progressive in CASES:
-    raw = source(width, height)
-    img = Image.frombytes('RGB', (width, height), raw)
-    buf = io.BytesIO()
-    img.save(buf, format='JPEG', quality=75, progressive=progressive)
-    jpeg = buf.getvalue()
-    decoded = Image.open(io.BytesIO(jpeg)).convert('RGB').tobytes()
-# Upstream re-saves a decoded JPEG as Pillow's default (baseline) JPEG at the requested quality:
-    # pillow_image.save(format='JPEG', optimize=..., quality=jpeg_quality), see images.py RasterImage.__init__.
-    re_encoded = io.BytesIO()
-    Image.open(io.BytesIO(jpeg)).convert('RGB').save(re_encoded, format='JPEG', quality=75)
-    base = f'/out/{name}'
-    open(base + '.source.rgb', 'wb').write(raw)
-    open(base + '.jpg', 'wb').write(jpeg)
-    open(base + '.decoded.rgb', 'wb').write(decoded)
-    open(base + '.reencoded.jpg', 'wb').write(re_encoded.getvalue())
-    json.dump({'width': width, 'height': height, 'progressive': progressive}, open(base + '.json', 'w'))
-    print(name, len(jpeg), 'bytes')
-
-# Grayscale: Pillow's 'L' JPEG at quality 75 (upstream re-saves gray EXIF images this way).
-gray_w, gray_h = 37, 23
-gray_raw = bytes((x * 7 + y * 11) & 255 for y in range(gray_h) for x in range(gray_w))
-gray_img = Image.frombytes('L', (gray_w, gray_h), gray_raw)
-buf = io.BytesIO()
-gray_img.save(buf, format='JPEG', quality=75)
-gray_jpeg = buf.getvalue()
-gray_decoded = Image.open(io.BytesIO(gray_jpeg)).convert('L').tobytes()
-gray_resaved = io.BytesIO()
-Image.open(io.BytesIO(gray_jpeg)).convert('L').save(gray_resaved, format='JPEG', quality=75)
-base = '/out/gray-baseline-37x23'
-open(base + '.source.rgb', 'wb').write(gray_raw)
-open(base + '.jpg', 'wb').write(gray_jpeg)
-open(base + '.decoded.rgb', 'wb').write(gray_decoded)
-open(base + '.reencoded.jpg', 'wb').write(gray_resaved.getvalue())
-json.dump({'width': gray_w, 'height': gray_h, 'progressive': False, 'channels': 1}, open(base + '.json', 'w'))
-print('gray-baseline-37x23', len(gray_jpeg), 'bytes')
+if __name__ == '__main__':
+    main()

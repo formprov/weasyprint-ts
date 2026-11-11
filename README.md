@@ -36,7 +36,7 @@ isn't and it goes to the tracker.
 | Layout: block, inline, tables, flex, floats, grid, columns, pagination | done |
 | Absolute positioning, transforms, opacity, @page + margin boxes, string-set | done |
 | Text: font matching, shaping, line breaking, hyphenation, soft hyphens, decorations | done; GPOS mark attachment is the one shaping frontier (tracked) |
-| Images: PNG, GIF, BMP, TIFF, WebP decode; JPEG pass-through and matched re-encode (EXIF, grayscale) | done; CMYK re-encode and rare chroma subsamplings pass through unencoded (tracked) |
+| Images: PNG, GIF, BMP, TIFF, WebP decode; JPEG decode (grayscale, RGB, CMYK/YCCK, every libjpeg subsampling, baseline and progressive) and Pillow-identical re-encode | done |
 | Backgrounds, borders, shadows, gradients | done |
 | Inline SVG, first-class (upstream SVG slices 0–11) | done |
 | PDF variants, PDF/A · UA · X, tagged PDF, forms, attachments, bookmarks, links, page boxes/labels | done (structure: 78/78 + PDF/X 4/4) |
@@ -328,8 +328,12 @@ fonts) with the raster-compare harness:
 |---|---|
 | Chromium native print | 11–13% |
 | Paged.js (polyfill, unmodified) | 14–19% |
-| Paged.js + quirk shims (filter drop, `@page :not(:first)` strip, oracle-measured table columns, per-block position calibration) | 9.8–15% |
+| Paged.js + quirk shims (filter drop, `@page :not(:first)` strip, oracle-measured table columns, per-block position calibration) | 8.8–14.6% |
 | **weasyprint-ts** | **0%** |
+
+Reproduce the contender panes with `python3 parity/side_by_side.py DOC.html --pagedjs`
+(in the source checkout the Paged.js runner is `harness/render_pagedjs.mjs`; the
+calibrated row uses `CALIBRATE=<oracle box dump>`).
 
 The residual for Chromium/Paged.js is structural, not cosmetic: line-box
 rounding, table auto-layout distribution, flex heights, and page
