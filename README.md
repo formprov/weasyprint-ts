@@ -6,10 +6,11 @@ HTML and CSS in, a paginated PDF out, laid out the way Python WeasyPrint does.
 We needed WeasyPrint's paged-media behaviour from Node — real page breaks,
 margin boxes, running headers, tables and text that break where CSS says they
 should — without a Python process and the Pango/HarfBuzz/FontConfig stack
-behind it. The JS ecosystem has two answers today: give the document to
-Chromium (and get Chromium's layout, not WeasyPrint's), or shell out to the
-Python binary (and ship Python with your app). This is a third one: the same
-layout arithmetic, in JavaScript.
+behind it. The JS ecosystem offers two routes today: run the document
+through Chromium, which means loading a full browser engine to produce a PDF
+and accepting its layout instead of WeasyPrint's; or call the Python binary,
+which means shipping Python with your app. Both are heavy dependencies for
+the job. This is a third route: the same layout arithmetic, in JavaScript.
 
 Every stage is ported from the Python source — CSS parsing, the cascade, the
 box tree, layout, text shaping, drawing, the PDF writer — with no native code
