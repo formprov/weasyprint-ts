@@ -77,18 +77,17 @@ def image_font_pin() -> Path | None:
     return cache
 
 
-def fontconf_env(font_dir: str | None, workdir: Path, docker: bool = False) -> dict:
+def fontconf_env(font_dir: str, workdir: Path, docker: bool = False) -> dict:
     """A minimal fontconfig pointing Python WeasyPrint at the same font files
-    the port uses (FONT_DIR). When a pin is active, also derive the port's
-    FontProfile from THIS fontconfig (fc-match for the generic families plus
-    the fallback sort order): a profile generated for the full production
-    image maps 'serif' to a specific family, while a bare <dir>-only
-    fontconfig resolves generics through its own sort (Open Sans first in the
-    oracle-fonts mirror), so keeping the production profile fabricates diffs
-    in documents that use the initial font (margin boxes) without naming a
-    family."""
-    if not font_dir:
-        return {}
+    the port uses (FONT_DIR), plus the port's FontProfile derived from THIS
+    fontconfig (generic aliases, fc-match sort order per family). Both engines
+    then resolve families the same way, including documents that use the
+    initial font (margin boxes) without naming a family.
+
+    Only used when the corpus ships its own fonts (test/corpus -> test/fonts):
+    for corpora without fonts both engines use the pinned image's font set, and
+    the oracle's default fontconfig already matches profiles/alpine_prod.json.
+    """
     cache = workdir / 'fc-cache'
     cache.mkdir(parents=True, exist_ok=True)
     conf = cache / 'fonts.conf'
@@ -96,7 +95,7 @@ def fontconf_env(font_dir: str | None, workdir: Path, docker: bool = False) -> d
         '<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">\n'
         f'<fontconfig><dir>{font_dir}</dir><cachedir>{cache}</cachedir></fontconfig>\n')
     env = {'FONTCONFIG_FILE': str(conf)}
-    profile = pinned_profile(conf, workdir, docker)
+    profile = pinned_profile(conf, workdir, docker, font_dir)
     if profile is not None:
         path = cache / 'profile.json'
         path.write_text(json.dumps(profile))
@@ -104,39 +103,49 @@ def fontconf_env(font_dir: str | None, workdir: Path, docker: bool = False) -> d
     return env
 
 
-def _fc_family(conf: str | None, pattern: str, docker: bool) -> str | None:
+def _docker_fc(conf: str, font_dir: str, workdir: Path, argv: list[str]) -> list[str]:
+    """docker command running fc-* against the pin: the font directory and the
+    generated fontconfig are mounted at their host paths so <dir> resolves."""
+    return ['docker', 'run', '--rm',
+            '-v', f'{font_dir}:{font_dir}:ro', '-v', f'{workdir}:{workdir}',
+            '-v', f'{conf}:/fc.conf:ro', '-e', 'FONTCONFIG_FILE=/fc.conf',
+            IMAGE, *argv]
+
+
+def _fc_family(conf: str, pattern: str, docker: bool, font_dir: str, workdir: Path) -> str | None:
     """fc-match's matched family for `pattern` under one fontconfig file."""
     if docker:
-        cmd = ['docker', 'run', '--rm', '-v', f'{conf}:/fc.conf:ro', IMAGE, 'fc-match', pattern]
-        out = run(cmd)
+        out = run(_docker_fc(conf, font_dir, workdir, ['fc-match', pattern]))
     else:
         out = run(['fc-match', pattern], env={**os.environ, 'FONTCONFIG_FILE': conf})
     m = re.search(r': "([^"]+)"', out.stdout)
     return m.group(1) if m else None
 
 
-def pinned_profile(conf: str, workdir: Path, docker: bool) -> dict | None:
+def pinned_profile(conf: str, workdir: Path, docker: bool, font_dir: str) -> dict | None:
     """FontProfile derived from the pinned fontconfig itself. Only ran when a
     pin is active; returns None on any tool failure (older setups then keep
     their hand-written profile)."""
     try:
         aliases = {}
-        families = []
         for generic in ('serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui'):
-            family = _fc_family(conf, generic, docker)
+            family = _fc_family(conf, generic, docker, font_dir, workdir)
             if family and family.lower() != generic:
                 aliases[generic] = family
-        fallback = _fc_fallback(conf, docker)
-        return {'aliases': aliases, 'fallback': fallback}
+        fallback = _fc_fallback(conf, docker, font_dir, workdir)
+        order = _fc_order(conf, docker, font_dir, workdir)
+        profile = {'aliases': aliases, 'fallback': fallback}
+        if order:
+            profile['order'] = order
+        return profile
     except (OSError, ValueError):
         return None
 
 
-def _fc_fallback(conf: str, docker: bool) -> list[str]:
+def _fc_fallback(conf: str, docker: bool, font_dir: str, workdir: Path) -> list[str]:
     """Ordered unique families of fc-match --sort (the glyph fallback order)."""
     if docker:
-        cmd = ['docker', 'run', '--rm', '-v', f'{conf}:/fc.conf:ro', IMAGE, 'fc-match', '--sort', 'serif']
-        out = run(cmd)
+        out = run(_docker_fc(conf, font_dir, workdir, ['fc-match', '--sort', 'serif']))
     else:
         out = run(['fc-match', '--sort', 'serif'], env={**os.environ, 'FONTCONFIG_FILE': conf})
     families = []
@@ -145,6 +154,43 @@ def _fc_fallback(conf: str, docker: bool) -> list[str]:
         if m and m.group(1) not in families:
             families.append(m.group(1))
     return families
+
+
+FC_ORDER_SCRIPT = r"""
+import json, subprocess
+def fc(args):
+    return subprocess.run(args, capture_output=True, text=True).stdout
+families = set()
+for line in fc(['fc-list', ':', 'family']).splitlines():
+    name = line.split(',')[0].strip()
+    if name:
+        families.add(name)
+for generic in ('serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui'):
+    families.add(generic)
+order = {}
+for family in sorted(families):
+    names = []
+    for line in fc(['fc-match', '-s', '-f', '%{family[0]}\n', family]).splitlines():
+        name = line.strip()
+        if name and name not in names:
+            names.append(name)
+    order[family.lower()] = names
+print(json.dumps(order))
+"""
+
+
+def _fc_order(conf: str, docker: bool, font_dir: str, workdir: Path) -> dict | None:
+    """fc-match --sort order for every installed family, like FontConfig gives
+    Pango: a missing glyph comes from the first family in *that* list, not from
+    one global fallback list (serif -> Times New Roman before Arial)."""
+    if docker:
+        out = run(_docker_fc(conf, font_dir, workdir, ['/venv/bin/python', '-c', FC_ORDER_SCRIPT]))
+    else:
+        out = run([sys.executable, '-c', FC_ORDER_SCRIPT], env={**os.environ, 'FONTCONFIG_FILE': conf})
+    try:
+        return json.loads(out.stdout)
+    except ValueError:
+        return None
 
 
 def run(cmd, **kw):
@@ -156,8 +202,19 @@ def render_python(html: Path, out: Path, stylesheet: str | None, args, env: dict
     image (the pinned production oracle); otherwise --python-cmd (default
     `weasyprint` on PATH) renders directly."""
     if args.docker:
-        cmd = ['docker', 'run', '--rm', '-v', f'{REPO}:{REPO}:ro', '-v', f'{out.parent.resolve()}:/out',
-               IMAGE, '/venv/bin/python', '-m', 'weasyprint']
+        cmd = ['docker', 'run', '--rm', '-v', f'{REPO}:{REPO}:ro', '-v', f'{out.parent.resolve()}:/out']
+        # Pin the oracle to the same font files as the port. Without this the
+        # container keeps its own font set while the port reads FONT_DIR, and a
+        # document using a face only one side has (Noto Sans Italic in
+        # test/fonts) fabricates a diff.
+        if env:
+            font_dir = env.get('FONT_DIR')
+            if font_dir:
+                cmd += ['-v', f'{font_dir}:{font_dir}:ro']
+            conf = env.get('FONTCONFIG_FILE')
+            if conf:
+                cmd += ['-v', f'{conf}:/fc.conf:ro', '-e', 'FONTCONFIG_FILE=/fc.conf']
+        cmd += [IMAGE, '/venv/bin/python', '-m', 'weasyprint']
         if stylesheet:
             cmd += ['-s', f'/docs/{stylesheet}' if not stylesheet.startswith('/') else stylesheet]
         doc_abs = html.resolve()
@@ -247,10 +304,19 @@ def main():
     # Pin both engines to byte-identical font files: the corpus's own fonts
     # when it ships any, else the oracle image's set (zero-config parity; an
     # unpinned fallback fabricates pixel diffs). --no-font-pin opts out.
-    font_dir = None if args.no_font_pin else (detect_font_dir(corpus) or image_font_pin())
-    env = {**dict(os.environ), **fontconf_env(font_dir, workdir, args.docker)}
+    # A corpus that ships its own fonts needs a matching fontconfig for the
+    # oracle (the image cannot see those files) plus a profile derived from it.
+    # Otherwise both engines use the pinned image's font set: the oracle keeps
+    # its default fontconfig, which is exactly what profiles/alpine_prod.json
+    # describes, so the port must not be given a different profile.
+    local_fonts = None if args.no_font_pin else detect_font_dir(corpus)
+    font_dir = local_fonts if local_fonts else (None if args.no_font_pin else image_font_pin())
+    if local_fonts:
+        env = {**dict(os.environ), **fontconf_env(local_fonts, workdir, args.docker)}
+    else:
+        env = dict(os.environ)
     if font_dir:
-        env['FONT_DIR'] = font_dir
+        env['FONT_DIR'] = str(font_dir)
         print(f'pinning both engines to fonts: {font_dir}')
 
     rows = []
