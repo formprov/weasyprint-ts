@@ -1,9 +1,9 @@
 # weasyprint-ts
 
-A TypeScript port of [WeasyPrint 70.0](https://github.com/Kozea/WeasyPrint):
-HTML and CSS in, a paginated PDF out, laid out the way Python WeasyPrint does.
+WeasyPrint-style HTML/CSS to PDF.
 
-We needed WeasyPrint's paged-media behaviour from Node: real page breaks,
+We needed [WeasyPrint](https://github.com/Kozea/WeasyPrint)'s paged-media
+behaviour from Node: real page breaks,
 margin boxes, running headers, and tables and text that break where CSS says
 they should. We also needed it without a Python process and the
 Pango/HarfBuzz/FontConfig stack behind it. The JS ecosystem offers two routes
@@ -392,6 +392,19 @@ quirky. Family 3 assumes the layout problem away by having you compute
 positions. Matching WeasyPrint therefore
 requires WeasyPrint's own layout arithmetic, which exists in one place:
 WeasyPrint. This project is that arithmetic, in TypeScript.
+
+## Thanks
+
+This project would not be possible without WeasyPrint. The port follows
+[WeasyPrint 70](https://github.com/Kozea/WeasyPrint) closely, and the bar it
+sets is unusually high: a complete CSS paged-media implementation, a precise
+PDF writer, and a test suite detailed enough that a from-scratch port can be
+checked against it pixel by pixel. That is what makes "zero differing
+pixels" a target worth aiming at, and most of the credit for the hard part
+belongs to WeasyPrint's authors and contributors.
+
+The runtime also leans on fontkit, linebreak, parse5, fast-png and fflate;
+thanks to their maintainers as well.
 
 ## License
 
