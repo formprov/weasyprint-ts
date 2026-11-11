@@ -74,9 +74,10 @@ round: open the page, read the badges, and flip through the pages.
 python3 parity/side_by_side.py mydoc.html -s mystyle.css
 ```
 
-Writes `sbs-mydoc/mydoc/side_by_side.html`: the two engines' page renders
-side by side, each with a pixel-diff badge, full-resolution PNGs one click
-away. Works on a directory of documents too.
+Writes `sbs-mydoc/side_by_side.html` (the per-document PDFs and PNGs live
+under `sbs-mydoc/mydoc/`): the two engines' page renders side by side, each
+with a pixel-diff badge, full-resolution PNGs one click away. Works on a
+directory of documents too.
 
 ### A note on what "identical" requires
 

@@ -189,8 +189,8 @@ your own documents:
 
 ```sh
 python3 parity/side_by_side.py flyer.html -s style.css
-# → sbs-flyer/flyer/side_by_side.html: page renders side by side,
-#   pixel-diff badge, full-resolution images one click away
+# → sbs-flyer/side_by_side.html: page renders side by side, pixel-diff
+#   badge, full-resolution images one click away (renders in sbs-flyer/flyer/)
 
 python3 parity/diffrun.py my-corpus/ --layout     # whole-directory differential
 python3 parity/accept.py my-docs/                 # vs PDFs from your pipeline
