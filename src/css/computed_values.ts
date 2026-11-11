@@ -142,7 +142,10 @@ const contentList = (values: any[]): any[] => {
   return out;
 };
 register(['bookmark-label'], (_s, _n, values) => contentList(values));
-register(['string-set'], (_s, _n, values) => values.map((v: any) => [v[0], contentList(v[1])]));
+register(['string-set'], (_s, _n, values) =>
+  // The initial value is the string 'none' (this port's empty marker), and a
+  // failed var() substitution falls back to it; only a validated list is an array.
+  Array.isArray(values) ? values.map((v: any) => [v[0], contentList(v[1])]) : 'none');
 register(['content'], (style, _n, values) => {
   if (values.length === 1) {
     const value = values[0];

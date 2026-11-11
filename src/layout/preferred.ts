@@ -526,7 +526,7 @@ export function tableAndColumnsPreferredWidths(context: any, box: AnyBox, outer 
   const width = table.style.get('width');
   let tableMinWidth: number;
   let tableMaxWidth: number;
-  if (width !== 'auto' && width.unit.toLowerCase() === 'px') {
+  if (width !== 'auto' && !checkMath(width) && width.unit.toLowerCase() === 'px') {
     // "percentages on the following properties are treated instead as though they were the
     // following: width: auto" (https://dbaron.org/css/intrinsic/#outer-intrinsic)
     tableMinWidth = tableMaxWidth = width.value;
