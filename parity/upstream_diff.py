@@ -17,6 +17,7 @@ upstream-out/diff/NAME.png for visual inspection.
 """
 import argparse
 import json
+import math
 import re
 import subprocess
 import sys
@@ -174,8 +175,33 @@ with ThreadPoolExecutor(args.workers) as ex:
     port = dict(ex.map(run_port, names))
 
 
-def raster(pdf, prefix):
-    subprocess.run(['gs', '-q', '-dNOPAUSE', '-dBATCH', '-sDEVICE=png16m', '-r96', '-dTextAlphaBits=4',
+MAX_PIXELS = 40_000_000
+
+
+def page_areas_in2(pdf):
+    """Page areas in square inches from each page's MediaBox (no rasterization).
+
+    Upstream's floating-point-error tests use @page size: 100000pt 100000px;
+    rasterizing those at 96 dpi needs tens of billions of pixels."""
+    script = (f'({pdf}) (r) file runpdfbegin 1 1 pdfpagecount '
+              '{ pdfgetpage /MediaBox get == } for quit')
+    result = subprocess.run(['gs', '-q', '-dNODISPLAY', '-dNOSAFER', '-c', script],
+                            capture_output=True, text=True)
+    areas = []
+    for line in result.stdout.splitlines():
+        parts = line.strip().strip('[]').split()
+        if len(parts) != 4:
+            continue
+        try:
+            values = [float(v) for v in parts]
+        except ValueError:
+            continue
+        areas.append(abs(values[2] - values[0]) / 72 * abs(values[3] - values[1]) / 72)
+    return areas
+
+
+def raster(pdf, prefix, dpi=96.0):
+    subprocess.run(['gs', '-q', '-dNOPAUSE', '-dBATCH', '-sDEVICE=png16m', f'-r{dpi}', '-dTextAlphaBits=4',
                     '-dGraphicsAlphaBits=4', f'-sOutputFile={prefix}-%03d.png', str(pdf)], capture_output=True)
     return sorted(prefix.parent.glob(prefix.name + '-*.png'))
 
@@ -188,8 +214,15 @@ def compare(name):
         return name, 'oracle-error', po
     if pt != 'ok':
         return name, 'port-error', pt
-    a = raster(out / f'{name}_py.pdf', out / f'{name}_py')
-    b = raster(out / f'{name}_ts.pdf', out / f'{name}_ts')
+    py_pdf, ts_pdf = out / f'{name}_py.pdf', out / f'{name}_ts.pdf'
+    areas = page_areas_in2(py_pdf) or page_areas_in2(ts_pdf)
+    dpi = 96.0
+    if areas:
+        largest = max(areas)
+        if largest > 0 and largest * dpi * dpi > MAX_PIXELS:
+            dpi = max(1.0, math.floor(math.sqrt(MAX_PIXELS / largest) * 10) / 10)
+    a = raster(py_pdf, out / f'{name}_py', dpi)
+    b = raster(ts_pdf, out / f'{name}_ts', dpi)
     if len(a) != len(b):
         verdict = ('page-count', f'{len(a)} vs {len(b)}')
     else:
