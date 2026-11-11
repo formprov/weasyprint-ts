@@ -1,0 +1,9 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+  @layer later, earlier;
+  @layer later { p { color: rgb(255, 0, 0) } }
+  @layer earlier { p { color: rgb(0, 0, 255) } }
+  @layer outer { @layer inner { p { font-weight: bold } } }
+  @layer { p { text-decoration: underline } }
+</style></head>
+<body><p>declared order: later is red, earlier is blue, so this is blue</p></body></html>

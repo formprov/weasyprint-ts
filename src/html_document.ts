@@ -154,6 +154,8 @@ export interface StyleOptions {
 export async function getAllComputedStyles(html: HTML, o: StyleOptions = {}): Promise<StyleFor> {
   const fetcher = html.fetcher;
   const sheets: SheetEntry[] = [];
+  // @layer order is document-wide (Python: one `layers` list shared by every sheet).
+  const layers: string[] = [];
   // Python: css.get_all_computed_styles seeds counter styles from html._ua_counter_style()
   for (const [name, definition] of UA_COUNTER_STYLE) html.counterStyle.set(name, definition);
   // The default UA's counter styles are already seeded above; re-defining them would warn.
@@ -165,7 +167,7 @@ export async function getAllComputedStyles(html: HTML, o: StyleOptions = {}): Pr
   if (o.presentationalHints) {
     sheets.push({ sheet: CSS.fromStringSync(HTML5_PH_CSS, { baseUrl: null, fetcher, mediaType: html.mediaType }), origin: 'author', specificity: [0, 0, 0] });
   }
-  for (const sheet of await findStylesheets(html.root, html.mediaType, fetcher, html.baseUrl)) {
+  for (const sheet of await findStylesheets(html.root, html.mediaType, fetcher, html.baseUrl, layers)) {
     sheets.push({ sheet, origin: 'author', specificity: null });
   }
   for (const sheet of o.userStylesheets ?? []) sheets.push({ sheet, origin: 'user', specificity: null });

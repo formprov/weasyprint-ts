@@ -251,11 +251,26 @@ function expandStyleRule(rule: QualifiedRule, baseUrl: string | null, matcher: M
   }
 }
 
+export interface StylesheetEntry {
+  rule: Rule | null;
+  baseUrl: string | null;
+  /** Layer context: the sheet is inside this layer (Python: preprocess_stylesheet's `layer`). */
+  layer?: string | null;
+  /** Register this layer at the entry's source position, then move on (an
+   * @import layer()/layer marker). */
+  declareLayer?: string;
+}
+
+/** Anonymous layer names only need to be unique; ordering comes from the
+ * position where they are registered. */
+let anonymousLayerCounter = 0;
+
 /** Resolve @import rules (recursively) into an inline rule list, each entry
- * carrying the baseUrl of the sheet it came from. */
-async function expandImports(rules: Rule[], baseUrl: string | null, fetcher: Fetcher, depth = 0,
-): Promise<Array<{ rule: Rule; baseUrl: string | null }>> {
-  const out: Array<{ rule: Rule; baseUrl: string | null }> = [];
+ * carrying the baseUrl and layer of the sheet it came from. */
+async function expandImports(rules: Rule[], baseUrl: string | null, fetcher: Fetcher, layers: string[],
+  layer: string | null = null, depth = 0,
+): Promise<StylesheetEntry[]> {
+  const out: StylesheetEntry[] = [];
   for (const rule of rules) {
     if (rule.type === 'at-rule' && rule.lowerAtKeyword === 'import' && rule.content === null) {
       if (depth > 10) {
@@ -263,12 +278,15 @@ async function expandImports(rules: Rule[], baseUrl: string | null, fetcher: Fet
         continue;
       }
       let target: string | null = null;
-      for (const t of rule.prelude) {
+      let urlIndex = -1;
+      for (let i = 0; i < rule.prelude.length; i++) {
+        const t = rule.prelude[i];
         if (t.type === 'url' || t.type === 'string') {
           try {
             const parsed = getUrl(t, baseUrl);
             if (parsed) target = parsed[1][1];
           } catch { /* relative URL with no base */ }
+          urlIndex = i;
           break;
         }
       }
@@ -276,16 +294,43 @@ async function expandImports(rules: Rule[], baseUrl: string | null, fetcher: Fet
         LOGGER.warning(`@import with an unresolvable URL ignored: ${serialize(rule.prelude)}`);
         continue;
       }
+      // `@import url(x) layer` / `layer(name)` puts the imported sheet in a layer.
+      // The layer is registered when preprocessing reaches this point, not here:
+      // layer order follows source order, and this pass runs before any rule.
+      let importedLayer = layer;
+      let declaresLayer = false;
+      let next = urlIndex + 1;
+      while (next < rule.prelude.length && (rule.prelude[next].type === 'whitespace' || rule.prelude[next].type === 'comment')) next++;
+      const modifier = rule.prelude[next] as Token | undefined;
+      if (modifier?.type === 'function' && modifier.lowerName === 'layer') {
+        const name = parseLayerName(removeWhitespace(modifier.arguments));
+        if (name === null) {
+          LOGGER.warning(`Invalid layer name '${serialize([modifier])}', the whole @import rule was ignored.`);
+          continue;
+        }
+        importedLayer = layer === null ? name : `${layer}.${name}`;
+        declaresLayer = true;
+      } else if (modifier?.type === 'ident' && modifier.value === 'layer') {
+        let anonymous = `@anonymous${anonymousLayerCounter++}`;
+        if (layer !== null) anonymous = `${layer}.${anonymous}`;
+        importedLayer = anonymous;
+        declaresLayer = true;
+      }
       try {
         const result = await fetcher.fetch(target);
         const imported = parseStylesheet(decodeCss(result.body));
-        out.push(...await expandImports(imported, result.redirectedUrl ?? target, fetcher, depth + 1));
+        const entries = await expandImports(imported, result.redirectedUrl ?? target, fetcher, layers,
+          importedLayer, depth + 1);
+        if (declaresLayer && importedLayer !== null) {
+          out.push({ rule: null, baseUrl, declareLayer: importedLayer });
+        }
+        out.push(...entries);
       } catch (e) {
         LOGGER.warning(`@import failed for '${target}': ${(e as Error).message}`);
       }
       continue;
     }
-    out.push({ rule, baseUrl });
+    out.push({ rule, baseUrl, layer });
   }
   return out;
 }
@@ -317,7 +362,7 @@ export class CSS {
   /** @color-profile rules (Python: css.ColorProfile, fetched by the document). */
   colorProfiles: Array<{ name: string; src: string; renderingIntent: string; components: string[] | null }> = [];
 
-  private constructor(entries: Array<{ rule: Rule; baseUrl: string | null }>, o: CSSOptions) {
+  private constructor(entries: StylesheetEntry[], o: CSSOptions) {
     this.baseUrl = o.baseUrl ?? null;
     this.matcher = o.matcher ?? new Matcher();
     this.pageRules = o.pageRules ?? [];
@@ -330,7 +375,7 @@ export class CSS {
   /** Parse a stylesheet, resolving @import rules through the fetcher. */
   static async fromString(css: string, o: CSSOptions): Promise<CSS> {
     const rules = parseStylesheet(css);
-    const entries = await expandImports(rules, o.baseUrl ?? null, o.fetcher);
+    const entries = await expandImports(rules, o.baseUrl ?? null, o.fetcher, o.layers ?? []);
     return new CSS(entries, o);
   }
 
@@ -343,7 +388,7 @@ export class CSS {
   static async fromUrl(url: string, o: CSSOptions): Promise<CSS> {
     const result = await o.fetcher.fetch(url);
     const css = decodeCss(result.body);
-    const entries = await expandImports(parseStylesheet(css), result.redirectedUrl ?? url, o.fetcher);
+    const entries = await expandImports(parseStylesheet(css), result.redirectedUrl ?? url, o.fetcher, o.layers ?? []);
     return new CSS(entries, { ...o, baseUrl: result.redirectedUrl ?? url });
   }
 }
@@ -354,13 +399,44 @@ function decodeCss(bytes: Uint8Array): string {
   return text;
 }
 
+/** Python: _parse_layer. A dotted layer name (`a.b`) from ident and dot tokens. */
+function parseLayerName(tokens: Token[]): string | null {
+  let name = '';
+  let lastDot = true;
+  for (const token of tokens) {
+    if (token.type === 'ident' && lastDot) { name += token.value as string; lastDot = false; }
+    else if (token.type === 'literal' && token.value === '.' && !lastDot) { name += '.'; lastDot = true; }
+    else return null;
+  }
+  return lastDot ? null : name;
+}
+
+/** Python: _add_layer. Register a layer, keeping nested layers next to their parent. */
+function addLayer(layer: string, layers: string[]): void {
+  let index: number | null = null;
+  let full = '';
+  for (const part of layer.split('.')) {
+    full = full ? `${full}.${part}` : part;
+    if (layers.includes(full)) { index = layers.indexOf(full); continue; }
+    if (index === null) { layers.push(full); index = layers.length - 1; }
+    else { layers.splice(index, 0, full); index -= 1; }
+  }
+}
+
 function preprocessStylesheet(
-  deviceMediaType: string, entries: Array<{ rule: Rule; baseUrl: string | null }>, fetcher: Fetcher, matcher: Matcher,
+  deviceMediaType: string, entries: StylesheetEntry[], fetcher: Fetcher, matcher: Matcher,
   pageRules: PageRule[], layers: string[], ignoreImportsIn: boolean, layer: string | null, counterStyle: CounterStyle,
   fontFaces: CSS['fontFaces'], colorProfiles: CSS['colorProfiles'] = [],
 ): void {
   let ignoreImports = ignoreImportsIn;
-  for (const { rule, baseUrl } of entries) {
+  for (const entry of entries) {
+    if (entry.declareLayer !== undefined) {
+      addLayer(entry.declareLayer, layers);
+      continue;
+    }
+    const { rule, baseUrl, layer: entryLayer } = entry;
+    if (rule === null) continue;
+    const currentLayer = entryLayer ?? layer;
     if (rule.type === 'error') {
       LOGGER.warning(`Parse error: ${rule.message}`);
       continue;
@@ -374,7 +450,7 @@ function preprocessStylesheet(
       continue;
     }
     if (rule.type === 'qualified-rule') {
-      expandStyleRule(rule, baseUrl, matcher, layer);
+      expandStyleRule(rule, baseUrl, matcher, currentLayer);
       ignoreImports = true;
     } else if (rule.type === 'at-rule' && rule.lowerAtKeyword === 'media') {
       const media = parseMediaQuery(rule.prelude);
@@ -385,7 +461,7 @@ function preprocessStylesheet(
       if (!evaluateMediaQuery(media, deviceMediaType)) continue;
       const contentRules = parseRuleList(rule.content!, false);
       preprocessStylesheet(deviceMediaType, contentRules.map((r) => ({ rule: r, baseUrl })), fetcher, matcher, pageRules,
-        layers, true, layer, counterStyle, fontFaces, colorProfiles);
+        layers, true, currentLayer, counterStyle, fontFaces, colorProfiles);
     } else if (rule.type === 'at-rule' && rule.lowerAtKeyword === 'page') {
       const data = parsePageSelectors(rule);
       if (data === null) {
@@ -544,13 +620,46 @@ function preprocessStylesheet(
         }
       }
       counterStyle.set(name, counter);
-    } else if (rule.type === 'at-rule' && ['import', 'layer', 'charset', 'namespace'].includes(rule.lowerAtKeyword)) {
+    } else if (rule.type === 'at-rule' && rule.lowerAtKeyword === 'layer') {
+      ignoreImports = true;
+      const prelude = removeWhitespace(rule.prelude);
+      const groups = prelude.length ? splitOnComma(prelude) : [];
+      let names: string[] | null = [];
+      for (const tokens of groups) {
+        const name = parseLayerName(tokens);
+        if (name === null) { names = null; break; }
+        names.push(currentLayer === null ? name : `${currentLayer}.${name}`);
+      }
+      if (names === null) {
+        LOGGER.warning(`Unsupported @layer selector '${serialize(rule.prelude)}', the whole @layer rule was ignored.`);
+        continue;
+      }
+      if (names.length > 1) {
+        if (rule.content !== null) {
+          LOGGER.warning('@layer rule with multiple layer names, the whole @layer rule was ignored.');
+          continue;
+        }
+        for (const name of names) addLayer(name, layers);
+        continue;
+      }
+      let newLayer: string;
+      if (names.length) {
+        newLayer = names[0];
+      } else {
+        newLayer = `@anonymous${layers.length}`;
+        if (currentLayer !== null) newLayer = `${currentLayer}.${newLayer}`;
+      }
+      addLayer(newLayer, layers);
+      if (rule.content === null) continue;
+      const contentRules = parseRuleList(rule.content, false);
+      preprocessStylesheet(deviceMediaType, contentRules.map((r) => ({ rule: r, baseUrl })), fetcher, matcher, pageRules,
+        layers, true, newLayer, counterStyle, fontFaces, colorProfiles);
+    } else if (rule.type === 'at-rule' && ['import', 'charset', 'namespace'].includes(rule.lowerAtKeyword)) {
       LOGGER.warning(`@${rule.atKeyword} rules are not supported yet (ignored)`);
     } else if (rule.type === 'at-rule') {
       LOGGER.warning(`Unknown rule @${rule.atKeyword}`);
     }
   }
-  void layers;
   void ignoreImports;
 }
 
@@ -742,7 +851,7 @@ function pageTypeMatch(sel: PageSelectorType, page: PageType): boolean {
 
 /** Find the stylesheets (<style> and <link rel=stylesheet>) of a document, in source order. */
 export async function findStylesheets(
-  root: Element, deviceMediaType: string, fetcher: Fetcher, baseUrl: string | null,
+  root: Element, deviceMediaType: string, fetcher: Fetcher, baseUrl: string | null, layers?: string[],
 ): Promise<CSS[]> {
   const out: CSS[] = [];
   for (const element of root.iterElements()) {
@@ -754,7 +863,7 @@ export async function findStylesheets(
     if (!evaluateMediaQuery(media, deviceMediaType)) continue;
     if (element.tag === 'style') {
       const content = [element.text ?? '', ...element.children.map((c) => c.tail ?? '')].join('');
-      out.push(await CSS.fromString(content, { baseUrl, fetcher, mediaType: deviceMediaType }));
+      out.push(await CSS.fromString(content, { baseUrl, fetcher, mediaType: deviceMediaType, layers }));
     } else if (element.get('href')) {
       const rels = (element.get('rel', '') ?? '').match(/[^ \t\n\f\r]+/g) ?? [];
       const lower = rels.map((r) => r.toLowerCase());
@@ -762,7 +871,7 @@ export async function findStylesheets(
       const href = parseUrl(element.get('href'), baseUrl);
       if (href !== null) {
         try {
-          out.push(await CSS.fromUrl(href, { fetcher, mediaType: deviceMediaType }));
+          out.push(await CSS.fromUrl(href, { fetcher, mediaType: deviceMediaType, layers }));
         } catch (e) {
           LOGGER.error(`Failed to load stylesheet at ${href}: ${(e as Error).message}`);
         }

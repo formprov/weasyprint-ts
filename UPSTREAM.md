@@ -8,15 +8,15 @@ and re-applied. Ported from tag **v70.0**.
 |---|---|---|
 | src/css/parser.ts | tinycss2 (dependency) | CSS Syntax 3 tokenizer/parser, from the spec |
 | src/css/color.ts, color_names.ts | tinycss2.color3/color5 | sRGB only (no lab/oklch/color()) |
-| src/css/tokens.ts | weasyprint/css/tokens.py, functions.py | calc()/math and gradients not yet |
-| src/css/units.ts | weasyprint/css/units.py | ex/ch/lh need text engine hooks |
+| src/css/tokens.ts | weasyprint/css/tokens.py, functions.py | |
+| src/css/units.ts | weasyprint/css/units.py | |
 | src/css/properties.ts | weasyprint/css/properties.py | complete |
-| src/css/validation/properties.ts | weasyprint/css/validation/properties.py | grid properties not yet |
-| src/css/validation/expanders.ts | weasyprint/css/validation/expanders.py | border-image, mask-border, grid shorthands not yet |
-| src/css/validation/index.ts | weasyprint/css/validation/__init__.py | CSS nesting not yet |
-| src/css/computed_values.ts | weasyprint/css/computed_values.py | grid tracks not yet; logical properties not yet |
-| src/css/style.ts | weasyprint/css/__init__.py (Style classes) | var() not yet |
-| src/css/index.ts | weasyprint/css/__init__.py | @import, @font-face, @layer, presentational hints not yet |
+| src/css/validation/properties.ts | weasyprint/css/validation/properties.py | |
+| src/css/validation/expanders.ts | weasyprint/css/validation/expanders.py | grid shorthands ported; border-image shorthand and mask-border not yet |
+| src/css/validation/index.ts | weasyprint/css/validation/__init__.py | |
+| src/css/computed_values.ts | weasyprint/css/computed_values.py | |
+| src/css/style.ts | weasyprint/css/__init__.py (Style classes) | |
+| src/css/index.ts | weasyprint/css/__init__.py | |
 | src/css/selectors.ts | cssselect2 (dependency) | subset |
 | src/html_document.ts | weasyprint/__init__.py (HTML) | |
 | src/dom.ts | tinyhtml5 + ElementTree (parse5-based) | |
