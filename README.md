@@ -3,15 +3,15 @@
 WeasyPrint-style HTML/CSS to PDF.
 
 We needed [WeasyPrint](https://github.com/Kozea/WeasyPrint)'s paged-media
-behaviour from Node: real page breaks,
-margin boxes, running headers, and tables and text that break where CSS says
-they should. We also needed it without a Python process and the
-Pango/HarfBuzz/FontConfig stack behind it. The JS ecosystem offers two routes
-today. One runs the document through Chromium, which means loading a full
-browser engine to produce a PDF and accepting Chromium's layout instead of
-WeasyPrint's. The other calls the Python binary, which means shipping Python
-with your app. Both are heavy dependencies for the job. This is a third
-route: the same layout arithmetic, in JavaScript.
+behaviour from Node: real page breaks, margin boxes, running headers, and
+tables and text that break where CSS says they should. We also needed it
+without a Python process and the Pango/HarfBuzz/FontConfig stack behind it.
+The JS ecosystem offers two routes today. One runs the document through
+Chromium, which means loading a full browser engine to produce a PDF and
+accepting Chromium's layout instead of WeasyPrint's. The other calls the
+Python binary, which means shipping Python with your app. Both are heavy
+dependencies for the job. This is a third route: the same layout arithmetic,
+in JavaScript.
 
 Every stage is ported from the Python source: CSS parsing, the cascade, the
 box tree, layout, text shaping, drawing, the PDF writer. There is no native
