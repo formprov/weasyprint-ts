@@ -38,6 +38,12 @@ export interface FontProfile {
   aliases: Record<string, string>;
   /** Installed families tried, in order, when the requested ones do not exist or lack a glyph. */
   fallback: string[];
+  /**
+   * FontConfig's `fc-match -s` family order per requested family. Pango builds
+   * its fontset from that sort, so a missing glyph is served by the first
+   * family in this list that has it (serif -> Times New Roman before Arial).
+   */
+  order?: Record<string, string[]>;
 }
 
 export class FontFace {
@@ -181,11 +187,23 @@ export class FontConfiguration {
     const add = (f: FontFace | null): void => {
       if (f && !out.includes(f)) out.push(f);
     };
-    for (const raw of [...families, ...this.profile.fallback]) {
-      const name = this.profile.aliases[raw.toLowerCase()] ?? raw;
-      add(this.pickFace(name, weight, italic, stretch));
+    const resolved = families.map((raw) => this.profile.aliases[raw.toLowerCase()] ?? raw);
+    for (const name of resolved) add(this.pickFace(name, weight, italic, stretch));
+    // FontConfig sorts the whole pattern, so a glyph the requested families lack
+    // comes from the first family in *their* sort order, not from a global list.
+    const own = this.profile.order?.[resolved[0]?.toLowerCase() ?? ''];
+    const order = own?.length ? own : this.profile.fallback;
+    for (const name of [...order, ...this.profile.fallback]) add(this.pickFace(name, weight, italic, stretch));
+    if (!out.length) {
+      // FontConfig always returns a font, even when no requested or fallback
+      // family is installed: the closest installed face by style and weight.
+      const best = [...this.faces].sort((a, b) =>
+        Number(a.italic !== italic) - Number(b.italic !== italic) ||
+        Math.abs(a.weight - weight) - Math.abs(b.weight - weight) ||
+        Math.abs(a.width - stretch) - Math.abs(b.width - stretch) ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))[0];
+      add(best ?? null);
     }
-    if (!out.length) add(this.faces[0] ?? null);
     this.matchCache.set(key, out);
     return out;
   }

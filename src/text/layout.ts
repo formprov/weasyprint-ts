@@ -21,11 +21,33 @@ const NO_FONT = /^[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}\p{Zs}]$/u;
 const ARABIC = /[\p{Script=Arabic}\p{Script=Syriac}\p{Script=Nko}\p{Script=Thaana}]/u;
 const HEBREW = /\p{Script=Hebrew}/u;
 
-/** OpenType script tag for shaping an item (Arabic-family joining and Hebrew marks; 'latn' otherwise). */
+/**
+ * OpenType script tag for shaping an item, as Pango's script iterator and
+ * HarfBuzz's hb_ot_tags_from_script would report it. Scripts without an entry
+ * keep 'latn' (the bank's Greek/Cyrillic/CJK cases were verified with it).
+ */
+const SCRIPT_TAGS: Array<[RegExp, string]> = [
+  [ARABIC, 'arab'],
+  [HEBREW, 'hebr'],
+  [/\p{Script=Devanagari}/u, 'deva'],
+  [/\p{Script=Bengali}/u, 'beng'],
+  [/\p{Script=Gurmukhi}/u, 'guru'],
+  [/\p{Script=Gujarati}/u, 'gujr'],
+  [/\p{Script=Oriya}/u, 'orya'],
+  [/\p{Script=Tamil}/u, 'taml'],
+  [/\p{Script=Telugu}/u, 'telu'],
+  [/\p{Script=Kannada}/u, 'knda'],
+  [/\p{Script=Malayalam}/u, 'mlym'],
+  [/\p{Script=Sinhala}/u, 'sinh'],
+  [/\p{Script=Tibetan}/u, 'tibt'],
+  [/\p{Script=Hangul}/u, 'hang'],
+  [/\p{Script=Thai}/u, 'thai'],
+  [/\p{Script=Lao}/u, 'lao'],
+];
+
 function scriptTag(cps: number[]): string {
   const text = String.fromCodePoint(...cps);
-  if (ARABIC.test(text)) return 'arab';
-  if (HEBREW.test(text)) return 'hebr';
+  for (const [pattern, tag] of SCRIPT_TAGS) if (pattern.test(text)) return tag;
   return 'latn';
 }
 

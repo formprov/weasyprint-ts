@@ -35,7 +35,7 @@ isn't and it goes to the tracker.
 | HTML parsing, CSS cascade, computed styles | done |
 | Layout: block, inline, tables, flex, floats, grid, columns, pagination | done |
 | Absolute positioning, transforms, opacity, @page + margin boxes, string-set | done |
-| Text: font matching, shaping, line breaking, hyphenation, soft hyphens, decorations | done; GPOS mark attachment is the one shaping frontier (tracked) |
+| Text: font matching, shaping, line breaking, hyphenation, soft hyphens, decorations | done (HarfBuzz normalization, script shapers, fallback marks) |
 | Images: PNG, GIF, BMP, TIFF, WebP decode; JPEG decode (grayscale, RGB, CMYK/YCCK, every libjpeg subsampling, baseline and progressive) and Pillow-identical re-encode | done |
 | Backgrounds, borders, shadows, gradients | done |
 | Inline SVG, first-class (upstream SVG slices 0–11) | done |
@@ -275,11 +275,23 @@ python3 parity/upstream_diff.py parity/upstream-cases --baseline parity/upstream
 
 ## Known gaps
 
-Complex-script shaping is the main one: GPOS mark attachment (accents on
-non-Latin text), synthetic oblique for mono/face-missing italics, and
-HarfBuzz-exact kern splits for fonts whose GPOS kerning uses placement
-records. Latin text with legacy `kern` tables (e.g. msttcorefonts) is
-already HarfBuzz-exact. See the tracker for the current shaping-parity work.
+None known for the scripts the pinned environment can render. Shaping
+reproduces HarfBuzz 13.2.1 closely enough to be pixel-identical on the
+complex-script corpus (`parity/upstream-cases-shaping`, 17 documents:
+Arabic, Hebrew, Devanagari, Thai, Hangul, Vietnamese, combining Latin,
+Greek/Cyrillic marks and GPOS kerning):
+
+- HarfBuzz's normalizer: shortest canonical decomposition, mark reordering
+  by the *modified* combining class, and recomposition from the canonical
+  composition table including CompositionExclusions (`src/text/normalize.ts`);
+- the Hangul and Thai script shapers (jamo composition/decomposition,
+  SARA AM reordering) and the right OpenType script tag per run;
+- HarfBuzz's fallback mark positioning for fonts without GPOS
+  (`src/text/fallback_marks.ts`), plus GDEF mark zeroing;
+- FontConfig's per-family sort order for missing-glyph fallback, so a serif
+  document picks Times New Roman before Arial exactly like Pango.
+
+The upstream test bank (1130 cases) and the samples stay pixel-identical.
 
 ## Contributing
 

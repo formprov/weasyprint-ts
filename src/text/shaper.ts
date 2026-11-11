@@ -8,6 +8,8 @@
  */
 import type { FontFace } from './font_config.ts';
 import { mirrorChar } from './bidi.ts';
+import { normalizeForShaping } from './normalize.ts';
+import { positionFallbackMarks } from './fallback_marks.ts';
 
 /** HarfBuzz em_scale: `(v * ((size << 16) / upem) + 32768) >> 16`, size in Pango units. */
 export function scale(v: number, size: number, upem: number): number {
@@ -97,21 +99,40 @@ export function shapeRun(
   ensureRequestedFeaturesAreGlobal(f);
   const featureObj: Record<string, boolean> = {};
   for (const [k, v] of Object.entries(features)) featureObj[k] = v !== 0;
-  const text = String.fromCodePoint(...codePoints.filter((c) => !IGNORABLE.has(c)));
+  // hb-ot-shaper-hangul.cc override_features_hangul: Uniscribe does not apply
+  // 'calt' for Hangul, and Noto Sans CJK's calt lookups otherwise substitute
+  // glyphs around jamo (including a different space glyph).
+  if (script === 'hang') featureObj.calt = false;
+  // HarfBuzz normalizes before shaping: full canonical decomposition, marks
+  // sorted by combining class, then recomposition wherever this font has the
+  // composed glyph (hb-ot-shape-normalize.cc).
+  const kept: number[] = [];
+  const keptOrig: number[] = [];
+  codePoints.forEach((c, i) => {
+    if (!IGNORABLE.has(c)) { kept.push(c); keptOrig.push(i); }
+  });
+  const norm = normalizeForShaping(kept, (cp) => f.hasGlyphForCodePoint(cp));
+  const text = String.fromCodePoint(...norm.map((n) => n.cp));
   const run = f.layout(text, featureObj, script, undefined, rtl ? 'rtl' : 'ltr');
-  // fontkit returns right-to-left runs in visual order; map clusters in logical order (the caller reorders).
+  // fontkit returns right-to-left runs in visual order; HarfBuzz positions in
+  // logical order and reverses at the very end, so do the same.
   if (rtl) {
     run.glyphs.reverse();
     run.positions.reverse();
   }
+  // Fonts without GPOS get HarfBuzz's fallback mark positioning (Arial's Hebrew
+  // niqqud and Arabic harakat are placed this way). Marks are always zero-width
+  // by GDEF class, GPOS or not (hb-ot-shape.cc zero_mark_widths_by_gdef).
+  const fallbackScaled = (f as any).GPOS
+    ? new Set<number>()
+    : positionFallbackMarks(f, run.glyphs, run.positions, rtl, size, f.unitsPerEm);
+  zeroGdefMarkAdvances(f, run.glyphs, run.positions);
   const out: ShapedGlyph[] = [];
   const spaceId = f.glyphForCodePoint(32).id;
   // Map each fontkit glyph back to code point indices in the *original* array.
   let ci = 0;
-  const origIndex: number[] = []; // filtered index -> original index
-  codePoints.forEach((c, i) => {
-    if (!IGNORABLE.has(c)) origIndex.push(i);
-  });
+  const normStart = norm.map((n) => keptOrig[n.start]);
+  const normEnd = norm.map((n) => keptOrig[n.end]);
   // Ignorable code points become zero-width EMPTY glyphs, merged into clusters.
   const emptyAt = new Map<number, number>();
   codePoints.forEach((c, i) => {
@@ -170,8 +191,8 @@ export function shapeRun(
     const n = g.codePoints.length;
     // A glyph without code points (an extra glyph of a multiple substitution, e.g. Arabic) belongs to the cluster
     // of the glyph before it, as HarfBuzz reports it.
-    const cluster = n === 0 && i > 0 ? previousCluster : origIndex[filtered] ?? codePoints.length;
-    const lastOrig = n === 0 ? cluster : origIndex[Math.min(filtered + n, origIndex.length) - 1] ?? cluster;
+    const cluster = n === 0 && i > 0 ? previousCluster : normStart[filtered] ?? codePoints.length;
+    const lastOrig = n === 0 ? cluster : normEnd[Math.min(filtered + n, norm.length) - 1] ?? cluster;
     filtered += n;
     previousCluster = cluster;
     const cp = g.codePoints[0];
@@ -186,7 +207,9 @@ export function shapeRun(
     }
     if (gid === 0 && cp !== undefined) gid = PANGO_GLYPH_UNKNOWN_FLAG | cp;
     glyphs.push({
-      gid, advance, xOffset: scale(p.xOffset, size, f.unitsPerEm), yOffset: -scale(p.yOffset, size, f.unitsPerEm),
+      gid, advance,
+      xOffset: fallbackScaled.has(i) ? p.xOffset : scale(p.xOffset, size, f.unitsPerEm),
+      yOffset: fallbackScaled.has(i) ? -p.yOffset : -scale(p.yOffset, size, f.unitsPerEm),
       cluster, clusterLength: lastOrig - cluster + 1,
     });
   });
@@ -200,25 +223,52 @@ export function shapeRun(
     b.xOffset += k2;
   }
   void ci;
-  // Interleave ignorable characters as EMPTY glyphs at their position.
+  // Interleave ignorable characters as EMPTY glyphs at their position. Glyphs
+  // stay in logical order with non-decreasing cluster values, so a cluster can
+  // hold several glyphs (a base plus its marks) and composition can make a
+  // later code point join an earlier cluster.
   let gi = 0;
   for (let i = 0; i < codePoints.length; i++) {
     if (emptyAt.has(i)) {
       out.push({ gid: PANGO_GLYPH_EMPTY, advance: 0, xOffset: 0, yOffset: 0, cluster: i, clusterLength: 1 });
       continue;
     }
-    while (gi < glyphs.length && glyphs[gi].cluster < i) gi++;
-    if (gi < glyphs.length && glyphs[gi].cluster === i) {
-      let skip = 1;
-      while (gi < glyphs.length && glyphs[gi].cluster === i) { // every glyph of the cluster
-        const g = glyphs[gi++];
-        out.push({ ...g });
-        skip = Math.max(skip, g.clusterLength);
-      }
-      i += skip - 1; // skip over cluster members
-    }
+    while (gi < glyphs.length && glyphs[gi].cluster <= i) out.push({ ...glyphs[gi++] });
+  }
+  while (gi < glyphs.length) out.push({ ...glyphs[gi++] });
+  // Pango cluster lengths span to the next different cluster value, which is
+  // also how a base+marks group reports the whole range.
+  let nextCluster = codePoints.length;
+  for (let k = out.length - 1; k >= 0; k--) {
+    if (k < out.length - 1 && out[k + 1].cluster > out[k].cluster) nextCluster = out[k + 1].cluster;
+    out[k].clusterLength = Math.max(1, nextCluster - out[k].cluster);
   }
   return out;
+}
+
+/** Zero the advance of every glyph GDEF classifies as a mark (class 3). */
+function zeroGdefMarkAdvances(font: any, glyphs: any[], positions: any[]): void {
+  const records: Array<{ start: number; end: number; class: number }> | undefined =
+    font.GDEF?.glyphClassDef?.classRangeRecord;
+  if (!records?.length) return;
+  const isMark = (gid: number): boolean => {
+    let lo = 0;
+    let hi = records.length - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      const record = records[mid];
+      if (gid < record.start) hi = mid - 1;
+      else if (gid > record.end) lo = mid + 1;
+      else return record.class === 3;
+    }
+    return false;
+  };
+  for (let i = 0; i < glyphs.length; i++) {
+    if (isMark(glyphs[i].id)) {
+      positions[i].xAdvance = 0;
+      positions[i].yAdvance = 0;
+    }
+  }
 }
 
 export interface FontExtents {
