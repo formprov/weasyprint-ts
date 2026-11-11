@@ -58,8 +58,8 @@ npm link weasyprint-ts   # optional: puts `weasyprint-ts` on your PATH
 ```
 
 Requires Node >= 20 (the published package ships compiled `dist/`). Running
-from a checkout of this repo executes the TypeScript source directly and
-needs Node >= 26 (native type stripping).
+from a checkout executes the TypeScript source directly, which needs Node
+22.18+ (native type stripping, no build step).
 
 ## Usage
 
@@ -121,10 +121,10 @@ TypeScript users get full declarations (`.d.ts` shipped), including the
 Fonts resolve like this:
 
 1. `FONT_DIR` environment variable (colon-separated directory list), else
-2. a `fonts/prod` directory found by walking up from the package (the port
-   lives inside its comparison-tool workspace, which pins the production
-   fonts there), else
-3. the platform's system font directories (macOS/Windows/Linux defaults).
+2. the platform's system font directories (macOS/Windows/Linux defaults).
+
+The parity scripts set `FONT_DIR` explicitly so both engines see the same
+files.
 
 A parsed font index is cached per directory in
 `.weasyprint-ts-font-index.json` (mtime/size-validated) to keep startup fast.
@@ -180,10 +180,10 @@ Layout code never imports fontkit directly. The default backend reproduces
 Pango/HarfBuzz behaviour (normalization, script shapers, fallback marks,
 synthetic caps); the seam stays open for alternative backends.
 
-## Comparing against WeasyPrint on your own documents
+## See it for yourself
 
 Every document below was rendered by **Python WeasyPrint (left)** and
-**weasyprint-ts (right)**: the same input, zero differing pixels:
+**weasyprint-ts (right)**: the same input, zero differing pixels.
 
 <p>
   <img src="examples/flyer-comparison/flyer/python-1.png" width="49%" alt="WeasyPrint render">
@@ -192,22 +192,72 @@ Every document below was rendered by **Python WeasyPrint (left)** and
 <p><sub>From <code>examples/flyer.html</code>. The generated comparison with full-resolution
 images lives in <code>examples/flyer-comparison/</code>.</sub></p>
 
-The `parity/` directory is a self-contained comparison harness. Run it on
-your own documents:
+Everything here compares against real Python WeasyPrint 70, not a recording.
+The oracle is a Docker image this repo builds (`parity/docker/alpine-prod-Dockerfile`):
+Alpine with Pango, HarfBuzz and a fixed font set, plus `weasyprint==70.0`. Both
+engines render the same file, Ghostscript rasterizes both PDFs at 96 dpi, and
+every pixel is compared.
+
+Prerequisites: Node 22.18+, Python 3.10+, Docker, Ghostscript (`gs`), qpdf. On
+macOS that is `brew install python node ghostscript qpdf`, plus Docker Desktop.
 
 ```sh
-python3 parity/side_by_side.py flyer.html -s style.css
-# → sbs-flyer/side_by_side.html: page renders side by side, pixel-diff
-#   badge, full-resolution images one click away (renders in sbs-flyer/flyer/)
+git clone <this repo> && cd weasyprint-ts
+npm ci
 
-python3 parity/diffrun.py my-corpus/ --layout     # whole-directory differential
-python3 parity/accept.py my-docs/                 # vs PDFs from your pipeline
+# Build the oracle once, a few minutes. The scripts below also do this for you
+# if the image is missing.
+docker build -t weasy-alpine-prod -f parity/docker/alpine-prod-Dockerfile parity/docker
 ```
 
-Requirements: Python WeasyPrint 70 (`pip install weasyprint==70.0`),
-Ghostscript, qpdf, Node 26+. See `parity/README.md` for the flags, the
-pinned-environment Docker images, and how font resolution affects the
-comparison.
+**One document, side by side.** This renders `examples/flyer.html` with both
+engines, keeps both PDFs, rasterizes them, and writes a page with the renders
+next to each other and a pixel-diff badge:
+
+```sh
+python3 parity/side_by_side.py examples/flyer.html --docker
+open examples/sbs-flyer/side_by_side.html
+```
+
+The output also keeps the raw PDFs
+(`examples/sbs-flyer/flyer/python.pdf` and `typescript.pdf`), so you can open
+them in any viewer, run `pdftotext` on them, or diff them yourself.
+
+**The repo corpus, with layout box trees:**
+
+```sh
+python3 parity/diffrun.py test/corpus --docker --layout
+```
+
+**The upstream test banks.** 3,044 documents, each rendered by both engines.
+Regenerating cases needs a checkout of upstream's own test suite; point
+`UPSTREAM_DIR` at it if it is not at `../reference_code/WeasyPrint`:
+
+```sh
+git clone --depth 1 --branch v70.0 https://github.com/Kozea/WeasyPrint ../reference_code/WeasyPrint
+python3 parity/upstream_diff.py parity/upstream-cases --baseline parity/upstream-baseline.json
+```
+
+**The official samples plus the corpus, as one review page.** This is what the
+acceptance round renders:
+
+```sh
+python3 parity/acceptance.py --docker
+open parity/acceptance-out/index.html
+```
+
+**The unit and corpus tests.** No Docker and no Python: the expected PDFs are
+committed.
+
+```sh
+npx tsc --noEmit
+npm test
+```
+
+`parity/README.md` covers the rest: `--python-cmd` to use a local
+`pip install weasyprint==70.0` instead of Docker, `--no-font-pin`, per-document
+reports, the optional Paged.js column, and how fonts are pinned so a missing
+host font cannot fabricate a diff.
 
 ## Development
 
@@ -280,7 +330,8 @@ is `parity/UPSTREAM_PLAYBOOK.md`; `parity/upstream-baseline.json` turns any
 new divergence into a named regression.
 
 ```sh
-python3 parity/extract_upstream.py ../reference_code/WeasyPrint/tests parity/upstream-cases
+export UPSTREAM_DIR=../reference_code/WeasyPrint   # a v70.0 checkout
+python3 parity/extract_upstream.py "$UPSTREAM_DIR/tests" parity/upstream-cases
 python3 parity/upstream_diff.py parity/upstream-cases --baseline parity/upstream-baseline.json
 ```
 
@@ -364,8 +415,9 @@ fonts) with the raster-compare harness:
 | **weasyprint-ts** | **0%** |
 
 Reproduce the contender panes with `python3 parity/side_by_side.py DOC.html --pagedjs`
-(in the source checkout the Paged.js runner is `harness/render_pagedjs.mjs`; the
-calibrated row uses `CALIBRATE=<oracle box dump>`).
+(the runner is `parity/pagedjs/render_pagedjs.mjs`; install it with
+`cd parity/pagedjs && npm install`). The calibrated row uses
+`CALIBRATE=<oracle box dump>`.
 
 The residual for Chromium/Paged.js is structural, not cosmetic: line-box
 rounding, table auto-layout distribution, flex heights, and page
