@@ -36,13 +36,15 @@ by the image id). An unpinned fallback — e.g. a host with no plain
 "Noto Serif" — fabricates pixel diffs entirely from font resolution. Opt out
 with `--no-font-pin`.
 
-When a pin is active, diffrun also derives the port's font *profile* from
-that same fontconfig (`fc-match` for the generic families plus the fallback
-sort order) and passes it via `FONT_PROFILE`: a bare `<dir>`-only fontconfig
-resolves generic families through its own fallback (Open Sans first in the
-oracle-fonts mirror, e.g. margin boxes that never name a family), which the
-generated production profile cannot know. Unset it by hand only if you know
-the pin was generated from the production environment.
+For a corpus with its own fonts, diffrun mounts the font directory and a
+bare `<dir>`-only fontconfig into the oracle container and derives the port's
+font *profile* from that same fontconfig (`fc-match` for the generic families,
+the per-family `fc-match --sort` order, and the fallback list) via
+`FONT_PROFILE`. Without the profile the two engines disagree on generics and
+on the family that serves a missing glyph (margin boxes that never name a
+family, Hebrew falling back to Times New Roman vs Arial). Corpora without
+local fonts use the image's own font set on both sides, so the port keeps
+`profiles/alpine_prod.json` and the oracle keeps its default fontconfig.
 
 Useful flags:
 
