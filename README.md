@@ -15,10 +15,10 @@ environment — by rendering the same documents side by side and comparing:
 - page geometry and page counts,
 - the rendered pixels at 96 dpi — currently **zero differing pixels**.
 
-The corpus comes from upstream's own test suite (~3,000 documents: extracts,
+The corpus comes from upstream's own test suite (3,044 documents: extracts,
 plus captures of what upstream's tests really render), and every commit is
-scored against it. The handful of residual discrepancies are documented in
-the issue tracker, down to the last antialiasing pixel.
+scored against it. The one known residual (JPEG + `--dpi` draft mode) is
+documented under *Known gaps*.
 
 ```
 weasyprint-ts -s style.css flyer.html flyer.pdf
@@ -39,7 +39,7 @@ isn't and it goes to the tracker.
 | Images: PNG, GIF, BMP, TIFF, WebP decode; JPEG decode (grayscale, RGB, CMYK/YCCK, every libjpeg subsampling, baseline and progressive) and Pillow-identical re-encode | done |
 | Backgrounds, borders, shadows, gradients | done |
 | Inline SVG, first-class (upstream SVG slices 0–11) | done |
-| PDF variants, PDF/A · UA · X, tagged PDF, forms, attachments, bookmarks, links, page boxes/labels | done (structure: 78/78 + PDF/X 4/4) |
+| PDF variants, PDF/A · UA · X, tagged PDF, forms, attachments, bookmarks, links, page boxes/labels | done (structure 110/110: metadata/links/bookmarks/attachments/forms/tags, PDF/A 16, PDF/X 4) |
 | CLI drop-in: `-s -a -p -e -m -u -D -j --pdf-variant …` | done, `--help` byte-identical |
 
 ## Install
@@ -81,22 +81,26 @@ Options are at full parity with upstream (see `docs/option-parity.md`); only
 Plain JavaScript, no TypeScript tooling required:
 
 ```js
+import { readFileSync, writeFileSync } from 'node:fs';
 import { HTML } from 'weasyprint-ts';
-import { writeFileSync } from 'node:fs';
+import { NodeFetcher, createFontConfiguration, defaultFontDirs } from 'weasyprint-ts/node';
 
-// The one IO seam (Fetcher) supplies the bytes of any URL the document asks for.
-const fetcher = {
-  fetch: async (url) => ({ body: new Uint8Array(await (await fetch(url)).arrayBuffer()) }),
-};
+// Fonts and URL bytes are the two IO seams; the Node entry supplies both.
+// The shipped profile maps generic families the way the production image does.
+const profile = new URL('../profiles/alpine_prod.json', import.meta.resolve('weasyprint-ts'));
+const fontConfig = createFontConfiguration(defaultFontDirs(), JSON.parse(readFileSync(profile, 'utf8')));
 
-const html = new HTML('<h1>Hello from the library.</h1>', { baseUrl: null, fetcher });
+const html = new HTML('<h1>Hello from the library.</h1>', {
+  baseUrl: null,
+  fetcher: new NodeFetcher(),
+});
 
 // Shortcuts mirroring the Python API:
-const pdf = await html.writePdf();                    // Uint8Array
-await html.writePdf('out.pdf', 1, { writeFile: (p, b) => writeFileSync(p, b) });
+const pdf = await html.writePdf(null, 1, { fontConfig });                 // Uint8Array
+await html.writePdf('out.pdf', 1, { fontConfig, writeFile: writeFileSync });
 
 // Or in two steps:
-const doc = await html.render({ fetcher });
+const doc = await html.render({ fontConfig });
 const subset = doc.copy(doc.pages.filter((_, i) => i % 2 === 0));
 writeFileSync('even.pdf', subset.writePdf());
 ```
@@ -112,7 +116,7 @@ Fonts resolve like this:
 2. a `fonts/prod` directory found by walking up from the package (the port
    lives inside its comparison-tool workspace, which pins the production
    fonts there), else
-3. no sources — system fallback behavior.
+3. the platform's system font directories (macOS/Windows/Linux defaults).
 
 A parsed font index is cached per directory in
 `.weasyprint-ts-font-index.json` (mtime/size-validated) to keep startup fast.
@@ -164,9 +168,9 @@ getTextEngine();          // active engine (fontkit + linebreak default)
 setTextEngine(engine);    // swap a backend without touching layout code
 ```
 
-Layout code never imports fontkit directly. A HarfBuzz-WASM backend for
-complex scripts would be an optional, separately-licensed package that calls
-`setTextEngine` — see *Known gaps* for why that's on the roadmap.
+Layout code never imports fontkit directly. The default backend reproduces
+Pango/HarfBuzz behaviour (normalization, script shapers, fallback marks,
+synthetic caps); the seam stays open for alternative backends.
 
 ## Comparing against WeasyPrint on your own documents
 
@@ -246,8 +250,8 @@ Both measures against the same pinned oracle the section above describes.
 category (pages, fonts, palette, images, text, links, pixels).
 
 **Upstream test cases** (`parity/upstream_diff.py`). The corpus currently
-holds 3,048 documents: ~1,139 extracted from upstream's own suite inputs and
-~1,909 captured by *running* upstream's pytest suite in the oracle container
+holds 3,044 documents: 1,135 extracted from upstream's own suite inputs and
+1,909 captured by *running* upstream's pytest suite in the oracle container
 (the tests build HTML dynamically, so the harness records what really gets
 rendered, including per-case options). A case passes when page count, page
 size, every pixel at 96 dpi and the PDF structure match the oracle.
@@ -257,16 +261,14 @@ size, every pixel at 96 dpi and the PDF structure match the oracle.
 | layout | 488 | 488 |
 | draw | 511 | 511 |
 | css | 63 | 63 |
-| top-level (API, HTML, PDF) | 67 | 68 |
-| **total** | **1129** | **1130** |
+| top-level (API, HTML, PDF) | 68 | 68 |
+| **total** | **1130** | **1130** |
 
 Five float-split cases are excluded because the oracle itself raises an
-exception on them (`parity/upstream-excluded.json`). The single open case
-fails by 24 antialiasing pixels in Ghostscript's rendering of a missing-glyph
-box; it, the ~1,900-case dynamic bank and the PDF-structure bank are all in
-the tracker under epic `weasy-qfx.8`, with the working playbook in
-`parity/UPSTREAM_PLAYBOOK.md` and a regression baseline in
-`parity/upstream-baseline.json`.
+exception on them (`parity/upstream-excluded.json`). The 1,909-case dynamic
+bank and the PDF-structure bank (110 cases) are also identical. The playbook
+is `parity/UPSTREAM_PLAYBOOK.md`; `parity/upstream-baseline.json` turns any
+new divergence into a named regression.
 
 ```sh
 python3 parity/extract_upstream.py ../reference_code/WeasyPrint/tests parity/upstream-cases
@@ -387,5 +389,6 @@ exactly one place: WeasyPrint. This port is that arithmetic, in TypeScript.
 This port is BSD-3-Clause — see `LICENSE` — the same license upstream
 WeasyPrint itself uses; its attribution is preserved in `NOTICE.md`. No
 LGPL/Pango code is translated: the text stack is a clean-room
-reimplementation from documented behavior, which is also why complex-script
-shaping is the honest frontier here rather than a solved checkbox.
+reimplementation from documented behaviour, verified pixel-identical on the
+complex-script corpus (Arabic, Hebrew, Devanagari, Thai, Hangul, combining
+marks), with JPEG + `--dpi` the one documented residual.

@@ -13,7 +13,7 @@ Source of truth: `reference_code/WeasyPrint/weasyprint/__main__.py` and `DEFAULT
 | `--pdf-identifier` | ok | |
 | `--pdf-variant` | ok | |
 | `--pdf-version` | ok | |
-| `--pdf-forms` | ok (text, password, textarea, checkbox, radio, select, submit; widget dictionaries equal to oracle apart from the font tag name) | warned and ignored; no form-field writing in `src/pdf` |
+| `--pdf-forms` | ok (text, password, textarea, checkbox, radio, select, submit; widget dictionaries verified against the oracle in the PDF-structure bank) | |
 | `--pdf-tags` | ok | |
 | `--uncompressed-pdf` | ok | |
 | `--xmp-metadata` | ok | files spliced into the XMP packet; like upstream, only has an effect with `--pdf-variant`. Packet verified byte-identical to oracle for pdf/a-1b,2b,3u,4e,4f, pdf/ua-1, pdf/x-1a,3,4 |
@@ -22,7 +22,7 @@ Source of truth: `reference_code/WeasyPrint/weasyprint/__main__.py` and `DEFAULT
 | `-p/--presentational-hints` | ok | |
 | `--optimize-images` | ok | |
 | `-j/--jpeg-quality` | ok | |
-| `-D/--dpi` | ok (PNG/GIF/BMP/TIFF/WebP and RGBA/LA byte-exact vs oracle; JPEG sizes exact, pixels differ slightly because Pillow's draft-mode DCT-scaled decode is not reproduced — tracked in weasy-vej) | warned and ignored; needs Pillow-exact resampling |
+| `-D/--dpi` | ok (PNG/GIF/BMP/TIFF/WebP and RGBA/LA byte-exact vs oracle; JPEG sizes exact, pixels differ slightly because Pillow's draft-mode DCT-scaled decode is not reproduced — tracked in weasy-vej) | |
 | `--full-fonts` | ok | |
 | `--hinting` | accepted, no effect | |
 | `-c/--cache-folder` | accepted, no effect | output-neutral |
@@ -34,7 +34,6 @@ Source of truth: `reference_code/WeasyPrint/weasyprint/__main__.py` and `DEFAULT
 | `-v/-d/-q` | ok | |
 
 Port-only: `--zoom`, `--ua-stylesheet` (harness).
-Not yet audited (ticket weasy-d25): Python API surface (`Document.copy`, `Page.paint`, `url_fetcher` hooks).
 
 ## Python API audit (ticket weasy-d25)
 

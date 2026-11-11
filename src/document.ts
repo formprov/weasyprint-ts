@@ -139,7 +139,9 @@ export const DEFAULT_OPTIONS = {
 } as const;
 
 /** Every valid option key of HTML.render/writePdf (defaults + render-only additions). */
-export const ALLOWED_OPTIONS = new Set([...Object.keys(DEFAULT_OPTIONS), 'fontConfig', 'fetch', 'zoom', 'userAgentCss', 'userAgentBaseUrl', 'encoding']);
+export const ALLOWED_OPTIONS = new Set([
+  ...Object.keys(DEFAULT_OPTIONS), 'fontConfig', 'fetch', 'zoom', 'userAgentCss', 'userAgentBaseUrl', 'encoding', 'writeFile',
+]);
 
 /** Warn on unknown option keys, exactly like upstream's render/write_pdf (weasyprint/__init__.py). */
 export function checkUnknownOptions(options: object): void {
