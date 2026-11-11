@@ -378,3 +378,83 @@ export function encodeJpegGrayscale(gray: Uint8Array, width: number, height: num
   bytes.push(0xff, 0xd9);
   return Uint8Array.from(bytes);
 }
+
+/**
+ * Four-component (CMYK) JPEG, as Pillow writes mode-CMYK images: libjpeg's
+ * JCS_CMYK setup (jcparam.c) uses 1x1 sampling for C, M, Y and K, one quant
+ * table (the luminance table), component ids 'C', 'M', 'Y', 'K', and an Adobe
+ * APP14 marker instead of JFIF. Pillow saves through rawmode "CMYK;I", so the
+ * samples it hands to libjpeg are inverted relative to the stored values.
+ */
+export function encodeJpegCmyk(cmyk: Uint8Array, width: number, height: number, quality = 75): Uint8Array {
+  const qLuma = scaledQuant(STD_LUMA_QUANT, quality);
+  const bw = new BitWriter();
+  const lumaDc = buildCodes(DC_LUMA_BITS, DC_LUMA_VALS);
+  const lumaAc = buildCodes(AC_LUMA_BITS, AC_LUMA_VALS);
+  const blocksW = Math.ceil(width / 8), blocksH = Math.ceil(height / 8);
+  const pw = blocksW * 8, ph = blocksH * 8;
+  const planes: Uint8Array[] = [];
+  for (let k = 0; k < 4; k++) {
+    const plane = new Uint8Array(pw * ph);
+    for (let y = 0; y < ph; y++) {
+      const sy = Math.min(y, height - 1);
+      for (let x = 0; x < pw; x++) {
+        const sx = Math.min(x, width - 1);
+        plane[y * pw + x] = 255 - cmyk[(sy * width + sx) * 4 + k];
+      }
+    }
+    planes.push(plane);
+  }
+  const block = new Float64Array(64);
+  const lastDc = [0, 0, 0, 0];
+  for (let by = 0; by < blocksH; by++) {
+    for (let bx = 0; bx < blocksW; bx++) {
+      for (let ci = 0; ci < 4; ci++) {
+        const plane = planes[ci];
+        for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) block[r * 8 + c] = plane[(by * 8 + r) * pw + bx * 8 + c] - 128;
+        fdctIslow(block);
+        const coef = new Int32Array(64);
+        for (let i = 0; i < 64; i++) {
+          const v = block[i];
+          const d = qLuma[i] << 3;
+          const q = Math.floor((Math.abs(v) + (d >> 1)) / d);
+          coef[i] = v < 0 ? -q : q;
+        }
+        const diff = coef[0] - lastDc[ci];
+        lastDc[ci] = coef[0];
+        const dn = magnitude(diff);
+        bw.put(lumaDc.code[dn], lumaDc.size[dn]);
+        if (dn) bw.put(diff < 0 ? diff - 1 : diff, dn);
+        let run = 0;
+        for (let k = 1; k < 64; k++) {
+          const v = coef[NATURAL_ORDER[k]];
+          if (v === 0) { run++; continue; }
+          while (run > 15) { bw.put(lumaAc.code[0xf0], lumaAc.size[0xf0]); run -= 16; }
+          const n = magnitude(v);
+          const sym = (run << 4) | n;
+          bw.put(lumaAc.code[sym], lumaAc.size[sym]);
+          bw.put(v < 0 ? v - 1 : v, n);
+          run = 0;
+        }
+        if (run > 0) bw.put(lumaAc.code[0], lumaAc.size[0]);
+      }
+    }
+  }
+  bw.flush();
+
+  const bytes: number[] = [0xff, 0xd8];
+  // Adobe APP14: "Adobe", version 100, flags 0, transform 0 (plain CMYK).
+  bytes.push(0xff, 0xee, 0x00, 0x0e, 0x41, 0x64, 0x6f, 0x62, 0x65, 0x00, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00);
+  bytes.push(0xff, 0xdb, 0x00, 0x43, 0x00, ...NATURAL_ORDER.map((n) => qLuma[n]));
+  bytes.push(0xff, 0xc0, 0x00, 0x14, 0x08, height >> 8, height & 0xff, width >> 8, width & 0xff, 0x04,
+    0x43, 0x11, 0x00, 0x4d, 0x11, 0x00, 0x59, 0x11, 0x00, 0x4b, 0x11, 0x00);
+  const dht = (cls: number, id: number, bits: number[], vals: number[]): void => {
+    bytes.push(0xff, 0xc4, 0x00, 2 + 1 + 16 + vals.length, (cls << 4) | id, ...bits, ...vals);
+  };
+  dht(0, 0, DC_LUMA_BITS, DC_LUMA_VALS);
+  dht(1, 0, AC_LUMA_BITS, AC_LUMA_VALS);
+  bytes.push(0xff, 0xda, 0x00, 0x0e, 0x04, 0x43, 0x00, 0x4d, 0x00, 0x59, 0x00, 0x4b, 0x00, 0x00, 0x3f, 0x00);
+  for (const b of bw.out) bytes.push(b);
+  bytes.push(0xff, 0xd9);
+  return Uint8Array.from(bytes);
+}

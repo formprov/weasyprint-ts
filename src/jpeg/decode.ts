@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /**
- * Baseline JPEG decoder that reproduces libjpeg(-turbo)'s default output:
- * integer inverse DCT (JDCT_ISLOW, jidctint.c), fancy 2x2 chroma upsampling
- * (jdsample.c h2v2_fancy_upsample) and fixed-point YCbCr->RGB (jdcolor.c).
- *
- * Scope: sequential Huffman, interleaved scans, 3-component YCbCr with 4:4:4 or
- * 4:2:0 sampling. Other layouts throw so callers can fall back.
+ * Baseline/progressive Huffman JPEG decoder that reproduces libjpeg(-turbo)'s
+ * default output as Pillow exposes it: integer inverse DCT (JDCT_ISLOW,
+ * jidctint.c), libjpeg's upsamplers (jdsample.c: fancy h2v1/h1v2/h2v2, box
+ * fallbacks and integral replication) and fixed-point colour conversion
+ * (jdcolor.c). 1 component decodes to L, 3 to RGB, 4 to CMYK (Pillow always
+ * assumes Adobe polarity for CMYK, so its samples are inverted). Other layouts
+ * throw so callers can fall back.
  */
 import { AC_CHROMA_BITS, AC_CHROMA_VALS, AC_LUMA_BITS, AC_LUMA_VALS, DC_CHROMA_BITS, DC_CHROMA_VALS, DC_LUMA_BITS, DC_LUMA_VALS } from './tables.ts';
 
@@ -16,8 +17,8 @@ const NATURAL_ORDER = [
   58, 59, 52, 45, 38, 31, 39, 46, 53, 60, 61, 54, 47, 55, 62, 63,
 ];
 
-/** Decoded pixels: RGB (3 channels), or the gray samples of a one-component JPEG (1 channel). */
-export interface RgbResult { width: number; height: number; data: Uint8Array; channels?: 1 | 3 }
+/** Decoded pixels: RGB (3 channels), CMYK (4) or the samples of a one-component JPEG (1). */
+export interface RgbResult { width: number; height: number; data: Uint8Array; channels?: 1 | 3 | 4 }
 
 interface HuffTable { maxcode: Int32Array; valptr: Int32Array; mincode: Int32Array; vals: Uint8Array }
 
@@ -169,11 +170,20 @@ interface Scan {
   start: number;
 }
 
-/** Decode a whole JPEG (baseline or progressive Huffman) to RGB, like libjpeg's defaults. */
+/**
+ * A structurally valid header whose entropy stream stops before the EOI marker.
+ * libjpeg pads the missing bits, but Pillow then raises "image file is truncated"
+ * and the oracle drops the image, so callers must treat this as a hard failure
+ * rather than as an unsupported layout.
+ */
+export class JpegTruncatedError extends Error {}
+
+/** Decode a whole JPEG (baseline or progressive Huffman) like Pillow's default libjpeg output. */
 export function decodeJpegLibjpeg(data: Uint8Array): RgbResult {
   const qtables: Int32Array[] = [];
   const huff: Record<string, HuffTable> = {};
   let width = 0, height = 0, hmax = 1, vmax = 1, restartInterval = 0, progressive = false;
+  let sawJfif = false, sawAdobe = false, adobeTransform = -1, sawEoi = false;
   let comps: Component[] = [];
   let mcusX = 0, mcusY = 0;
   const scans: Scan[] = [];
@@ -185,10 +195,21 @@ export function decodeJpegLibjpeg(data: Uint8Array): RgbResult {
     const m = data[pos + 1];
     if (m === 0xff) { pos++; continue; }
     if (m === 0xd8 || m === 0x01 || (m >= 0xd0 && m <= 0xd7)) { pos += 2; continue; }
-    if (m === 0xd9) break;
+    if (m === 0xd9) { sawEoi = true; break; }
     const len = (data[pos + 2] << 8) | data[pos + 3];
     const seg = pos + 4, end = pos + 2 + len;
-    if (m === 0xdb) {
+    if (m === 0xe0) {
+      // jdmarker.c: only APP0 blocks starting with "JFIF\0" set saw_JFIF_marker.
+      if (len >= 7 && data[seg] === 0x4a && data[seg + 1] === 0x46 && data[seg + 2] === 0x49 &&
+          data[seg + 3] === 0x46 && data[seg + 4] === 0) sawJfif = true;
+    } else if (m === 0xee) {
+      // Adobe APP14: version(2), flags0(2), flags1(2), transform(1) after "Adobe".
+      if (len >= 14 && data[seg] === 0x41 && data[seg + 1] === 0x64 && data[seg + 2] === 0x6f &&
+          data[seg + 3] === 0x62 && data[seg + 4] === 0x65) {
+        sawAdobe = true;
+        adobeTransform = data[seg + 11];
+      }
+    } else if (m === 0xdb) {
       let p = seg;
       while (p < end) {
         const pq = data[p] >> 4, tq = data[p] & 15; p++;
@@ -215,11 +236,14 @@ export function decodeJpegLibjpeg(data: Uint8Array): RgbResult {
       height = (data[seg + 1] << 8) | data[seg + 2];
       width = (data[seg + 3] << 8) | data[seg + 4];
       const nc = data[seg + 5];
-      if (nc !== 3 && nc !== 1) throw new Error('only 1- and 3-component JPEG supported');
+      if (nc !== 3 && nc !== 1 && nc !== 4) throw new Error(`unsupported JPEG component count ${nc}`);
       comps = [];
       for (let i = 0; i < nc; i++) {
         const o = seg + 6 + i * 3;
-        comps.push({ id: data[o], h: data[o + 1] >> 4, v: data[o + 1] & 15, tq: data[o + 2],
+        const h = data[o + 1] >> 4, vv = data[o + 1] & 15;
+        // jdinput.c start_input_pass: sampling factors must be 1..4 (MAX_SAMP_FACTOR).
+        if (h < 1 || h > 4 || vv < 1 || vv > 4) throw new Error('bad JPEG sampling factors');
+        comps.push({ id: data[o], h, v: vv, tq: data[o + 2],
           blocksW: 0, blocksH: 0, realW: 0, realH: 0, coef: new Int16Array(0), dcPred: 0, td: 0, ta: 0 });
       }
       hmax = Math.max(...comps.map((c) => c.h));
@@ -251,6 +275,11 @@ export function decodeJpegLibjpeg(data: Uint8Array): RgbResult {
         scomps.push(c);
       }
       const q = seg + 1 + ns * 2;
+      // jdinput.c start_input_pass: an interleaved scan may carry at most
+      // MAX_BLOCKS_IN_MCU (10) blocks; libjpeg refuses the file otherwise.
+      let blocksInMcu = 0;
+      for (const c of scomps) blocksInMcu += c.h * c.v;
+      if (ns > 1 && blocksInMcu > 10) throw new Error('too many blocks in MCU');
       const scan: Scan = { comps: scomps, Ss: data[q], Se: data[q + 1], Ah: data[q + 2] >> 4, Al: data[q + 2] & 15, start: end };
       scans.push(scan);
       const reader = new BitReader(data, end);
@@ -261,6 +290,9 @@ export function decodeJpegLibjpeg(data: Uint8Array): RgbResult {
     pos = end;
   }
   if (!frameFound || scans.length === 0) throw new Error('no supported frame/scan');
+  // libjpeg pads a stream that stops mid-scan with zero bits, but Pillow then reports
+  // "image file is truncated" and the oracle drops the image: reject a missing EOI too.
+  if (!sawEoi) throw new JpegTruncatedError('image file is truncated');
 
   // Dequantize + IDCT every block into full planes.
   const planes = comps.map((c) => {
@@ -281,14 +313,27 @@ export function decodeJpegLibjpeg(data: Uint8Array): RgbResult {
   const compsOut = comps.map((c, i) => ({ ...c, plane: planes[i].plane, pw: planes[i].pw }));
   if (comps.length === 1) return { width, height, data: crop(compsOut[0], width, height), channels: 1 };
 
-  // Full-size planes (width x height): fancy upsampling for 4:2:0 chroma (jdsample.c), crop otherwise.
-  const full: Uint8Array[] = [];
-  for (let ci = 0; ci < 3; ci++) {
-    const c = compsOut[ci];
-    if (c.h === hmax && c.v === vmax) full.push(crop(c, width, height));
-    else if (c.h * 2 === hmax && c.v * 2 === vmax) full.push(fancyH2V2(c, width, height));
-    else throw new Error('unsupported chroma sampling');
+  // libjpeg jdapimin.c default_decompress_parms: guess the input colour space
+  // from the markers, then convert to Pillow's output mode.
+  let space: 'ycbcr' | 'rgb' | 'cmyk' | 'ycck';
+  if (comps.length === 4) {
+    if (!sawAdobe || adobeTransform === 0) space = 'cmyk';
+    else space = 'ycck'; // 2, and anything else after libjpeg's warning
+  } else if (sawJfif) space = 'ycbcr';
+  else if (sawAdobe) space = adobeTransform === 0 ? 'rgb' : 'ycbcr';
+  else {
+    const [c0, c1, c2] = comps.map((c) => c.id);
+    space = c0 === 0x52 && c1 === 0x47 && c2 === 0x42 ? 'rgb' : 'ycbcr';
   }
+
+  const full = compsOut.map((c) => upsample(c, hmax, vmax, width, height));
+  if (space === 'rgb') return { width, height, data: merge(full, 3, width, height, (v) => v) };
+  if (space === 'cmyk') {
+    // Pillow decodes 4-component JPEGs with rawmode "CMYK;I": Adobe polarity is
+    // assumed, so every sample is inverted after libjpeg's null conversion.
+    return { width, height, data: merge(full, 4, width, height, (v) => 255 - v), channels: 4 };
+  }
+  if (space === 'ycck') return { width, height, data: ycck2cmyk(full, width, height), channels: 4 };
   return { width, height, data: ycc2rgb(full, width, height) };
 }
 
@@ -423,8 +468,10 @@ function decodeScan(reader: BitReader, scan: Scan, progressive: boolean, restart
   }
 }
 
-function ycc2rgb(full: Uint8Array[], width: number, height: number): Uint8Array {
-  // jdcolor.c, fixed point SCALEBITS 16.
+interface YccTables { crr: Int32Array; cbb: Int32Array; crg: Int32Array; cbg: Int32Array }
+
+/** jdcolor.c build_ycc_rgb_table. */
+function yccTables(): YccTables {
   const FIX = (x: number): number => Math.trunc(x * 65536 + 0.5);
   const ONE_HALF = 1 << 15;
   const crr = new Int32Array(256), cbb = new Int32Array(256), crg = new Int32Array(256), cbg = new Int32Array(256);
@@ -435,6 +482,11 @@ function ycc2rgb(full: Uint8Array[], width: number, height: number): Uint8Array 
     crg[i] = -FIX(0.71414) * x;
     cbg[i] = -FIX(0.34414) * x + ONE_HALF;
   }
+  return { crr, cbb, crg, cbg };
+}
+
+function ycc2rgb(full: Uint8Array[], width: number, height: number): Uint8Array {
+  const { crr, cbb, crg, cbg } = yccTables();
   const clamp = (v: number): number => (v < 0 ? 0 : v > 255 ? 255 : v);
   const out = new Uint8Array(width * height * 3);
   const [Y, Cb, Cr] = full;
@@ -447,6 +499,26 @@ function ycc2rgb(full: Uint8Array[], width: number, height: number): Uint8Array 
   return out;
 }
 
+/**
+ * YCCK -> CMYK as Pillow exposes it. libjpeg's ycck_cmyk_convert writes
+ * 255 - (Y + channel), K unchanged; Pillow's "CMYK;I" raw mode then inverts
+ * everything, which cancels out for C/M/Y and inverts K.
+ */
+function ycck2cmyk(full: Uint8Array[], width: number, height: number): Uint8Array {
+  const { crr, cbb, crg, cbg } = yccTables();
+  const clamp = (v: number): number => (v < 0 ? 0 : v > 255 ? 255 : v);
+  const out = new Uint8Array(width * height * 4);
+  const [Y, Cb, Cr, K] = full;
+  for (let i = 0; i < width * height; i++) {
+    const yv = Y[i], cbv = Cb[i], crv = Cr[i];
+    out[i * 4] = clamp(yv + crr[crv]);
+    out[i * 4 + 1] = clamp(yv + ((cbg[cbv] + crg[crv]) >> 16));
+    out[i * 4 + 2] = clamp(yv + cbb[cbv]);
+    out[i * 4 + 3] = 255 - K[i];
+  }
+  return out;
+}
+
 function crop(c: { plane: Uint8Array; pw: number }, width: number, height: number): Uint8Array {
   const out = new Uint8Array(width * height);
   for (let y = 0; y < height; y++) out.set(c.plane.subarray(y * c.pw, y * c.pw + width), y * width);
@@ -454,23 +526,99 @@ function crop(c: { plane: Uint8Array; pw: number }, width: number, height: numbe
 }
 
 /** h2v2 fancy upsampling (jdsample.c). Output plane is width x height (luma size). */
-function fancyH2V2(c: { plane: Uint8Array; pw: number }, width: number, height: number): Uint8Array {
-  const cw = Math.ceil(width / 2), ch = Math.ceil(height / 2);
+function h2v2Fancy(c: { plane: Uint8Array; pw: number }, dw: number, ch: number, width: number, height: number): Uint8Array {
   const out = new Uint8Array(width * height);
-  const colsum = new Int32Array(cw);
+  const colsum = new Int32Array(dw);
   for (let y = 0; y < height; y++) {
     const ci = y >> 1;
     const far = (y & 1) === 0 ? Math.max(0, ci - 1) : Math.min(ch - 1, ci + 1);
     const near = ci;
-    for (let i = 0; i < cw; i++) colsum[i] = c.plane[near * c.pw + i] * 3 + c.plane[far * c.pw + i];
-    for (let i = 0; i < cw; i++) {
+    for (let i = 0; i < dw; i++) colsum[i] = c.plane[near * c.pw + i] * 3 + c.plane[far * c.pw + i];
+    for (let i = 0; i < dw; i++) {
       const thiscs = colsum[i];
       const lastcs = colsum[Math.max(0, i - 1)];
-      const nextcs = colsum[Math.min(cw - 1, i + 1)];
+      const nextcs = colsum[Math.min(dw - 1, i + 1)];
       const x0 = 2 * i;
-      out[y * width + x0] = (thiscs * 3 + lastcs + 8) >> 4;
+      if (x0 < width) out[y * width + x0] = (thiscs * 3 + lastcs + 8) >> 4;
       if (x0 + 1 < width) out[y * width + x0 + 1] = (thiscs * 3 + nextcs + 7) >> 4;
     }
+  }
+  return out;
+}
+
+/** h2v1 fancy upsampling (jdsample.c): horizontal triangle filter, rows untouched. */
+function h2v1Fancy(c: { plane: Uint8Array; pw: number }, dw: number, ch: number, width: number, height: number): Uint8Array {
+  const out = new Uint8Array(width * height);
+  for (let y = 0; y < ch && y < height; y++) {
+    const row = y * c.pw;
+    const o = y * width;
+    const inAt = (i: number): number => c.plane[row + Math.min(dw - 1, i)];
+    for (let i = 0; i < dw; i++) {
+      const x0 = 2 * i;
+      const value = inAt(i);
+      if (x0 === 0) {
+        if (x0 < width) out[o + x0] = value;
+        if (x0 + 1 < width) out[o + x0 + 1] = (value * 3 + inAt(1) + 2) >> 2;
+      } else if (i === dw - 1) {
+        if (x0 < width) out[o + x0] = (value * 3 + inAt(i - 1) + 1) >> 2;
+        if (x0 + 1 < width) out[o + x0 + 1] = value;
+      } else {
+        if (x0 < width) out[o + x0] = (value * 3 + inAt(i - 1) + 1) >> 2;
+        if (x0 + 1 < width) out[o + x0 + 1] = (value * 3 + inAt(i + 1) + 2) >> 2;
+      }
+    }
+  }
+  return out;
+}
+
+/** h1v2 fancy upsampling (jdsample.c, the 4:4:0 case): vertical triangle filter. */
+function h1v2Fancy(c: { plane: Uint8Array; pw: number }, dw: number, ch: number, width: number, height: number): Uint8Array {
+  const out = new Uint8Array(width * height);
+  for (let y = 0; y < height; y++) {
+    const ci = y >> 1;
+    const far = (y & 1) === 0 ? Math.max(0, ci - 1) : Math.min(ch - 1, ci + 1);
+    const bias = (y & 1) === 0 ? 1 : 2;
+    const o = y * width, nearRow = ci * c.pw, farRow = far * c.pw;
+    for (let x = 0; x < width && x < dw; x++) {
+      out[o + x] = (c.plane[nearRow + x] * 3 + c.plane[farRow + x] + bias) >> 2;
+    }
+  }
+  return out;
+}
+
+/** Box replication for 2:1 ratios, used when libjpeg's fancy path is disabled by a tiny width. */
+function boxUpsample(c: { plane: Uint8Array; pw: number }, hExp: number, vExp: number, dw: number, ch: number,
+  width: number, height: number): Uint8Array {
+  const out = new Uint8Array(width * height);
+  for (let y = 0; y < height; y++) {
+    const sr = Math.min(ch - 1, Math.floor(y / vExp));
+    const o = y * width, row = sr * c.pw;
+    for (let x = 0; x < width; x++) out[o + x] = c.plane[row + Math.min(dw - 1, Math.floor(x / hExp))];
+  }
+  return out;
+}
+
+/** Full-size plane for one component: libjpeg's _jinit_upsampler method selection. */
+function upsample(c: { plane: Uint8Array; pw: number; h: number; v: number },
+  hmax: number, vmax: number, width: number, height: number): Uint8Array {
+  const dw = Math.ceil(width * c.h / hmax), ch = Math.ceil(height * c.v / vmax);
+  if (c.h === hmax && c.v === vmax) return crop(c, width, height);
+  if (c.h * 2 === hmax && c.v === vmax) {
+    return dw > 2 ? h2v1Fancy(c, dw, ch, width, height) : boxUpsample(c, 2, 1, dw, ch, width, height);
+  }
+  if (c.h === hmax && c.v * 2 === vmax) return h1v2Fancy(c, dw, ch, width, height);
+  if (c.h * 2 === hmax && c.v * 2 === vmax) {
+    return dw > 2 ? h2v2Fancy(c, dw, ch, width, height) : boxUpsample(c, 2, 2, dw, ch, width, height);
+  }
+  if (hmax % c.h === 0 && vmax % c.v === 0) return boxUpsample(c, hmax / c.h, vmax / c.v, dw, ch, width, height);
+  throw new Error('unsupported chroma sampling');
+}
+
+/** Interleave n full-size planes, optionally mapping each sample. */
+function merge(planes: Uint8Array[], n: number, width: number, height: number, map: (v: number) => number): Uint8Array {
+  const out = new Uint8Array(width * height * n);
+  for (let i = 0; i < width * height; i++) {
+    for (let k = 0; k < n; k++) out[i * n + k] = map(planes[k][i]);
   }
   return out;
 }
