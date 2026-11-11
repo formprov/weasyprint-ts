@@ -114,14 +114,17 @@ export function drawFirstLine(stream: PdfStream, textbox: AnyBox, textOverflow: 
 
   stream.setTextMatrix(...matrix.values);
   let previousFace: any = null;
+  let previousSize = 0;
   let string = '';
   let font: any = null;
   let fontSize = 0;
   for (const run of firstLine.runs) {
     fontSize = run.size * FROM_UNITS;
-    if (run.face !== previousFace) {
-      // Add font file content and get font size.
+    if (run.face !== previousFace || run.size !== previousSize) {
+      // Add font file content and get font size. A synthetic-caps run keeps the
+      // same face but a smaller size, so the size alone also forces a new Tf.
       previousFace = run.face;
+      previousSize = run.size;
       font = stream.addFont(run.face, fontSize, layout.style);
       // Go through the run glyphs.
       if (string) stream.showText(string);
