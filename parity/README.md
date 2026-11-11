@@ -55,6 +55,19 @@ Useful flags:
   (build it first: `docker build -t weasy-alpine-prod -f parity/docker/alpine-prod-Dockerfile .`)
 - `--limit N` — first N documents only
 
+## The acceptance page
+
+```sh
+python3 parity/acceptance.py            # 8 official samples + test/corpus, side by side
+```
+
+Builds one `parity/acceptance-out/index.html` with two groups — the official
+WeasyPrint samples and this repo's own corpus — each document showing the
+Python WeasyPrint render next to the port's, page by page, with a
+pixel-parity badge. The samples use the pinned image's fonts for both
+engines; the corpus pins `test/fonts` for both. This is the human acceptance
+round: open the page, read the badges, and flip through the pages.
+
 ## Side-by-side renders for a single document
 
 ```sh
