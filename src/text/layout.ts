@@ -610,7 +610,14 @@ export class Layout {
       return px;
     };
     for (const it of items) {
-      const face = it.face ?? this.faces[0];
+      // A space-only item (Pango leaves its font unset) takes the base font
+      // when it covers the space; otherwise the first face that does, so a
+      // @font-face whose unicode-range excludes the space cannot provide the
+      // strut metrics.
+      const base = this.faces[0];
+      const cp = this.cps[it.start];
+      const spaceLike = cp === 0x20 || cp === 0xa0 || /^\p{Zs}$/u.test(String.fromCodePoint(cp));
+      const face = it.face ?? (spaceLike && !base.hasGlyph(cp) ? this.faceFor(cp, base) : base);
       const cps = this.cps.slice(it.start, it.end);
       const rtl = it.level % 2 === 1;
       // Pango shapes with the font's own features (fontconfig) first, then the style's, which win.
