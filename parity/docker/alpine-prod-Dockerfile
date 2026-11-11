@@ -1,0 +1,6 @@
+FROM alpine:3.24
+RUN apk add --no-cache python3 py3-pip pango harfbuzz-subset fontconfig \
+      font-noto font-noto-arabic font-noto-thai font-noto-devanagari font-noto-symbols \
+      font-noto-math font-noto-cjk font-opensans ghostscript-fonts msttcorefonts-installer \
+ && update-ms-fonts && fc-cache -f \
+ && python3 -m venv /venv && /venv/bin/pip install -q weasyprint==70.0

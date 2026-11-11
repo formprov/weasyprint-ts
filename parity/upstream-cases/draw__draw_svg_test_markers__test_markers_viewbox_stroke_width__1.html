@@ -1,0 +1,21 @@
+<html><body>
+      <style>
+        @page { size: 11px 13px }
+        svg { display: block }
+      </style>
+      <svg width="11px" height="13px" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="rectangle" viewBox="-1 -1 3 3"
+                  markerWidth="1.5" markerHeight="1.5">
+            <rect x="-10" y="-10" width="20" height="20" fill="red" />
+            <rect x="-1" y="-1" width="1" height="1" fill="blue" />
+          </marker>
+        </defs>
+        <path
+          d="M 5 2 v 4 v 4"
+          stroke-width="2"
+          marker-start="url(#rectangle)"
+          marker-mid="url(#rectangle)"
+          marker-end="url(#rectangle)" />
+      </svg>
+    </body></html>

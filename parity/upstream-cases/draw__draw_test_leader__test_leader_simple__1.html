@@ -1,0 +1,22 @@
+<html><body>
+      <style>
+        @page {
+          size: 16px 6px;
+        }
+        body {
+          color: red;
+          counter-reset: count;
+          font-family: weasyprint;
+          font-size: 2px;
+          line-height: 1;
+        }
+        div::after {
+          color: blue;
+          content: ' ' leader(dotted) ' ' counter(count, lower-roman);
+          counter-increment: count;
+        }
+      </style>
+      <div>a</div>
+      <div>bb</div>
+      <div>c</div>
+    </body></html>

@@ -1,0 +1,22 @@
+<html><body>
+      <style>
+        @page { size: 10px }
+        svg { display: block }
+      </style>
+      <svg width="10px" height="10px" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="parent" cx="5" cy="5" r="5" fx="5" fy="5" fr="2"
+            gradientUnits="userSpaceOnUse">
+            <stop stop-color="red" offset="25%"></stop>
+            <stop stop-color="blue" offset="25%"></stop>
+          </radialGradient>
+          <radialGradient id="grad" href="#parent" cx="0.5" cy="0.5" r="0.5"
+            fx="0.5" fy="0.5" fr="0.2"
+            gradientUnits="objectBoundingBox">
+            <stop stop-color="blue" offset="25%"></stop>
+            <stop stop-color="red" offset="25%"></stop>
+          </radialGradient>
+        </defs>
+        <rect x="0" y="0" width="10" height="10" fill="url(#grad)" />
+      </svg>
+    </body></html>

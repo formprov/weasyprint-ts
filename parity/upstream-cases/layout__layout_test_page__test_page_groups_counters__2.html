@@ -1,0 +1,29 @@
+
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            @page { size: 1000px }
+            div { page: group }
+            h1 { break-before: page }
+            p.counter::after { content: counter(pages) }
+            @page :nth(1 of group) { background-color: blue; size: 500px; }
+          </style>
+        </head>
+        <body>
+          INTRO PAGE
+          <div>
+            <h1>Title</h1>
+            <p>content</p>
+            <h1>Title</h1>
+            <p class="counter">content</p>
+          </div>
+          <div>
+            <h1>Title</h1>
+            <p>content</p>
+            <h1>Title</h1>
+            <p class="counter">content</p>
+          </div>
+        </body>
+      </html>
+    

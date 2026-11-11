@@ -1,0 +1,20 @@
+<html><body>
+      <style>
+        @page { size: 11px 13px }
+        svg { display: block }
+      </style>
+      <svg width="11px" height="13px" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="rectangle"
+                  refX="1" refY="1" markerWidth="3" markerHeight="3">
+            <rect width="6" height="6" fill="red" />
+            <rect width="2" height="2" fill="blue" />
+          </marker>
+        </defs>
+        <path
+          d="M 5 2 v 4 v 4"
+          marker-start="url(#rectangle)"
+          marker-mid="url(#rectangle)"
+          marker-end="url(#rectangle)" />
+      </svg>
+    </body></html>

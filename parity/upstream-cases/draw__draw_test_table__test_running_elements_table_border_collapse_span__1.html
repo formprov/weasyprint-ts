@@ -1,0 +1,24 @@
+<html><body>
+      <style>
+        @page {
+          margin: 0 0 10px 0;
+          size: 15px;
+          @bottom-left { content: element(table) }
+        }
+        body { font: 2px/1 weasyprint }
+        table {
+          border: 1px solid black;
+          border-collapse: collapse;
+          color: red;
+          position: running(table);
+        }
+        td { border: 1px solid black }
+        div { page-break-after: always }
+      </style>
+      <table>
+        <tr> <td rowspan=2>A</td> <td>B</td> <td>C</td> </tr>
+        <tr> <td colspan=2>D</td> </tr>
+      </table>
+      <div>1</div>
+      <div>2</div>
+    </body></html>

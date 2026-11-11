@@ -1,0 +1,3 @@
+@font-face { src: url(weasyprint.otf); font-family: weasyprint }
+@page { background: white; bleed: 0 }
+body { background: #fff; margin: 0 }

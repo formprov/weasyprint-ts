@@ -1,0 +1,21 @@
+<html><body>
+        <style>
+            @page {
+                size: 9px 10px;
+                margin: 0;
+            }
+            body {
+                font-family: weasyprint;
+                font-size: 2px;
+                line-height: 1;
+                orphans: 2;
+                widows: 2;
+                margin: 0;
+            }
+            span {
+                float: footnote;
+            }
+            p + p { break-before: avoid }
+        </style>
+        <div>a<br>b</div>
+        <p>c<br>d<span>x</span><span>y</span><span>z</span></p><p>e</p></body></html>

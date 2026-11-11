@@ -1,0 +1,7 @@
+<html><body>
+      <style>
+        html { --counter-name: page }
+        a::after { content: target-counter(attr(href), var(--counter-name)) }
+      </style>
+      <a id="link" href="#link"></a>
+    </body></html>

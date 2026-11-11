@@ -1,0 +1,24 @@
+<html><body>
+        <style>
+            @page {
+                size: 16px 8px;
+                @note-area {
+                    content: element(sidenotes, all-once);
+                    position: absolute;
+                    bottom: 0;
+                    right: 0;
+                    width: calc(10 / 16 * 100%);
+                }
+            }
+            div {
+                color: red;
+                font-family: weasyprint;
+                font-size: 2px;
+                line-height: 1;
+            }
+            span {
+                display: block;
+                position: note(sidenotes);
+            }
+        </style>
+        <div>abc<span>de</span>fgh<span>ij</span></div></body></html>

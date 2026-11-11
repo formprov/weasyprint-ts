@@ -1,0 +1,16 @@
+<html><body>
+      <style>
+        @page {
+          size: 13px 9px;
+          margin: 2px;
+        }
+        body {
+          color: red;
+          font-family: weasyprint;
+          font-size: 3px;
+          text-decoration: underline blue max(1rem, 1px);
+          text-underline-offset: 2px;
+        }
+        div::after { content: "abc" }
+      </style>
+      <div></div></body></html>

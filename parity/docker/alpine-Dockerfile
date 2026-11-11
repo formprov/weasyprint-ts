@@ -1,0 +1,4 @@
+FROM alpine:3.24
+RUN apk add --no-cache python3 py3-pip pango harfbuzz-subset fontconfig \
+ && python3 -m venv /venv && /venv/bin/pip install -q weasyprint==70.0
+ENV FONTCONFIG_FILE=/tmp/weasy/fonts/fonts.conf

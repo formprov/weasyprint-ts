@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Spring Print Fair</title>
+<style>
+@page { size: letter; margin: 18mm }
+body { font-family: 'Noto Sans'; font-size: 14px; color: #222 }
+.hero { border: 2px solid #2e5d34; border-radius: 14px; padding: 22px; background: #f2f7f0 }
+h1 { font-size: 30px; margin: 0 0 4px; color: #2e5d34 }
+.tagline { font-style: italic; color: #557 }
+.cols { display: flex; margin-top: 18px }
+.col { flex: 1; padding-right: 14px }
+.when { font-weight: bold; margin-top: 10px }
+table { width: 100%; border-collapse: collapse; margin-top: 14px }
+th, td { border: 1px solid #bbb; padding: 6px 10px; text-align: left; font-size: 13px }
+th { background: #e8efe6 }
+td.num { text-align: right }
+.stamp { position: absolute; top: 14%; left: 55%; transform: rotate(-8deg); opacity: 0.65;
+         font-size: 26px; font-weight: bold; color: #b33; border: 3px solid #b33;
+         border-radius: 8px; padding: 4px 14px }
+</style>
+</head>
+<body>
+<div class="hero">
+  <h1>Spring Print Fair</h1>
+  <div class="tagline">A one-day market for letterpress, zines and fine printing</div>
+</div>
+<div class="cols">
+  <div class="col">
+    <div class="when">Saturday, May 9 — 10:00 to 16:00</div>
+    <div>Riverside Hall, 42 Mill Lane</div>
+  </div>
+  <div class="col">
+    <strong>Stalls from $35</strong><br>
+    Live typesetting demos<br>
+    Paper &amp; tool swap table
+  </div>
+</div>
+<table>
+  <thead><tr><th>Pass</th><th>Includes</th><th>Price</th></tr></thead>
+  <tbody>
+    <tr><td>Visitor</td><td>All-day entry + talks</td><td class="num">$5</td></tr>
+    <tr><td>Stall</td><td>Table + two chairs</td><td class="num">$35</td></tr>
+    <tr><td>Workshop</td><td>Compositing hands-on</td><td class="num">$18</td></tr>
+  </tbody>
+</table>
+<div class="stamp">ADMIT ONE</div>
+</body>
+</html>

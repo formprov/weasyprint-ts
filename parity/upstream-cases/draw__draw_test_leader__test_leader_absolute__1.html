@@ -1,0 +1,24 @@
+<html><body>
+      <style>
+        @page {
+          size: 8px 2px;
+        }
+        body {
+          color: red;
+          font-family: weasyprint;
+          font-size: 1px;
+          line-height: 1;
+        }
+        div::before {
+          color: blue;
+          content: leader('z');
+        }
+        article {
+          bottom: 0;
+          color: lime;
+          position: absolute;
+          right: 0;
+        }
+      </style>
+      <div>aa<article>bb</article>aa</div>
+    </body></html>

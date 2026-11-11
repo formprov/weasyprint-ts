@@ -1,0 +1,26 @@
+<html><body>
+      <style>
+        @page { size: 200px 200px }
+        @page small { size: 100px 100px }
+        @page :nth(1 of small) { size: 50px 50px }
+        section { page: small }
+        div, div section { break-after: page }
+      </style>
+      <div></div>
+      <article></article>
+      <section>
+        <div></div>
+        <div></div>
+      </section>
+      <section>
+      </section>
+      <div></div>
+      <div></div>
+      <section>
+        <div></div>
+      </section>
+      <div>
+        <section></section>
+        <section></section>
+      </div>
+    </body></html>

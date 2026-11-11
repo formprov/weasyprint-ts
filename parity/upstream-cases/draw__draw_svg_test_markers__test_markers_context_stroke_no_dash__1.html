@@ -1,0 +1,19 @@
+<html><body>
+      <style>
+        @page { size: 11px 3px }
+        svg { display: block }
+      </style>
+      <svg width="11px" height="3px" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="line" markerWidth="6" markerHeight="2"
+                  markerUnits="userSpaceOnUse">
+            <line x1="0" y1="1" x2="6" y2="1"
+                  stroke="context-stroke" stroke-width="2" />
+          </marker>
+        </defs>
+        <path
+          d="M 2 1 h 6"
+          stroke="red" stroke-width="0" stroke-dasharray="1"
+          marker-start="url(#line)" />
+      </svg>
+    </body></html>

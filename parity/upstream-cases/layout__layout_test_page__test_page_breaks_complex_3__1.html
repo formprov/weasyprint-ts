@@ -1,0 +1,14 @@
+<html><body>
+      <style>
+        @page { size: 140px; margin: 0 }
+        img { height: 25px; vertical-align: top }
+      </style>
+      <img src=pattern.png><!-- page break here -->
+      <div>
+        <p style="page-break-inside: avoid">
+          <img src=pattern.png><br/><img src=pattern.png></p>
+        <p style="page-break-before: avoid; page-break-after: avoid; widows: 2"
+          ><img src=pattern.png><br/><img src=pattern.png></p>
+      </div>
+      <img src=pattern.png>
+    </body></html>

@@ -1,0 +1,34 @@
+<html><body>
+      <style>
+        header {
+          position: running(header);
+        }
+        p {
+          font: 2px/1 weasyprint;
+          position: absolute;
+        }
+        div {
+          break-before: page;
+        }
+        @page {
+          size: 10px;
+          margin: 2px;
+          @top-center {
+            content: element(header);
+          }
+        }
+      </style>
+      <header>
+        <p>
+          abc<br>
+          abc<br>
+          abc<br>
+          abc<br>
+          abc<br>
+        </p>
+      </header>
+      <div>a</div>
+      <div>a</div>
+      <div>a</div>
+      <div>a</div>
+    </body></html>

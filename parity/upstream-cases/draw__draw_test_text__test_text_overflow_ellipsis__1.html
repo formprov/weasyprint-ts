@@ -1,0 +1,27 @@
+<html><body>
+      <style>
+        @page {
+          size: 9px 16px;
+        }
+        body {
+          color: red;
+          font-family: weasyprint;
+          font-size: 2px;
+        }
+        div {
+          line-height: 1;
+          margin: 1px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          width: 3.5em;
+        }
+        div div {
+          margin: 0;
+        }
+      </style>
+      <div>abcde</div>
+      <div style="white-space: nowrap">a bcde</div>
+      <div><span>a<span>b</span>cd</span>e</div>
+      <div><div style="text-overflow: clip">abcde</div></div>
+      <div><div style="overflow: visible">abcde</div></div>
+</body></html>

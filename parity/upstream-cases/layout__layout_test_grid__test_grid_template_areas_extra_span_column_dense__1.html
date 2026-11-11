@@ -1,0 +1,21 @@
+<html><body>
+      <style>
+        article {
+          display: grid;
+          font-family: weasyprint;
+          font-size: 2px;
+          grid-auto-flow: column dense;
+          grid-template-areas: 'a . b' 'c d d';
+          line-height: 1;
+          width: 12px;
+        }
+      </style>
+      <article>
+        <div style="grid-area: a">a</div>
+        <div style="grid-area: b">b</div>
+        <div style="grid-area: c">c</div>
+        <div style="grid-area: d">d</div>
+        <div style="grid-row: span 2">e</div>
+        <div>f</div>
+      </article>
+    </body></html>

@@ -1,0 +1,66 @@
+{
+  "name": "weasyprint-ts",
+  "version": "0.1.0",
+  "description": "TypeScript port of WeasyPrint 70: HTML + CSS to PDF with pixel-exact output. Pure TS, no native dependencies.",
+  "type": "module",
+  "license": "BSD-3-Clause",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./node": {
+      "types": "./dist/cli/node.d.ts",
+      "default": "./dist/cli/node.js"
+    }
+  },
+  "bin": {
+    "weasyprint-ts": "./dist/cli/main.js"
+  },
+  "files": [
+    "dist",
+    "profiles",
+    "fonts"
+],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aceitw/weasyprint-ts.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aceitw/weasyprint-ts/issues"
+  },
+  "homepage": "https://github.com/aceitw/weasyprint-ts#readme",
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "weasyprint",
+    "pdf",
+    "html-to-pdf",
+    "css-paged-media",
+    "pagination",
+    "typescript",
+    "javascript",
+    "html"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test 'test/**/*.test.ts'",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "fast-png": "^8.0.0",
+    "fflate": "^0.8.3",
+    "fontkit": "^2.0.4",
+    "linebreak": "^2.0.0",
+    "parse5": "^7.3.0"
+  },
+  "devDependencies": {
+    "@types/fontkit": "^2.0.9",
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
+  }
+}

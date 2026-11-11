@@ -1,0 +1,24 @@
+<html><body>
+      <table style="width: 1000px; border-spacing: 0 100px;
+                    font: 20px/1em serif; margin: 3px; table-layout: fixed">
+        <tr>
+          <td rowspan=0 style="height: 420px; vertical-align: top"></td>
+          <td>X<br>X<br>X</td>
+          <td><table style="margin-top: 20px; border-spacing: 0">
+            <tr><td>X</td></tr></table></td>
+          <td style="vertical-align: top">X</td>
+          <td style="vertical-align: middle">X</td>
+          <td style="vertical-align: bottom">X</td>
+        </tr>
+        <tr>
+          <!-- cells with no text (no line boxes) is a corner case
+               in cell baselines -->
+          <td style="padding: 15px"></td>
+          <td><div style="height: 10px"></div></td>
+        </tr>
+        <tr></tr>
+        <tr>
+            <td style="vertical-align: bottom"></td>
+        </tr>
+      </table>
+    </body></html>

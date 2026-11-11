@@ -1,0 +1,15 @@
+<html><body>
+      <style>
+        html { --name: title; --counter: title, upper-roman }
+        h1 { counter-increment: var(--name) }
+        div::before { content: counter(var(--counter)) }
+      </style>
+      <section>
+        <h1></h1>
+        <div></div>
+        <h1></h1>
+        <div></div>
+        <h1></h1>
+        <div style="--counter: var(--name), lower-roman"></div>
+      </section>
+    </body></html>

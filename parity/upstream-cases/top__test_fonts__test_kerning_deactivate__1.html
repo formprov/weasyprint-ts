@@ -1,0 +1,15 @@
+<html><body>
+      <style>
+        @font-face {
+          src: url(weasyprint.otf);
+          font-family: no-kern;
+          font-feature-settings: 'kern' 0;
+        }
+        @font-face {
+          src: url(weasyprint.otf);
+          font-family: kern;
+        }
+        span:nth-child(1) { font-family: kern }
+        span:nth-child(2) { font-family: no-kern }
+      </style>
+      <span>kk</span><span>kk</span></body></html>

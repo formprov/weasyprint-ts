@@ -1,0 +1,25 @@
+<html><body>
+    <style>
+        @page {
+            size: 9px 6px;
+
+            @footnote {
+                margin-left: 1px;
+                max-height: 3px;
+            }
+        }
+        div {
+            color: red;
+            font-family: weasyprint;
+            font-size: 2px;
+            line-height: 1;
+        }
+        div.footnote {
+            float: footnote;
+            color: blue;
+            &::footnote-call { color: red }
+        }
+    </style>
+    <div>ab<div class="footnote">c</div><div class="footnote">d</div></div>
+    <div>ef</div>
+    <div>gh</div></body></html>

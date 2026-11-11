@@ -1,0 +1,15 @@
+<html><body>
+      <style>
+        @page { size: 100px; margin: 0 }
+        img { height: 30px; display: block; }
+      </style>
+      <div>
+        <img src=pattern.png style="page-break-after: always">
+        <section>
+          <img src=pattern.png><!-- page break here -->
+          <img src=pattern.png style="page-break-after: avoid">
+        </section>
+      </div>
+      <img src=pattern.png style="page-break-after: avoid">
+      <img src=pattern.png>
+    </body></html>

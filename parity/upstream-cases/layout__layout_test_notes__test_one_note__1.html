@@ -1,0 +1,17 @@
+<html><body>
+        <style>
+            @page {
+                size: 10px 4px;
+                @note-area {
+                    content: element(sidenotes, all-once);
+                }
+            }
+            div {
+                font: 2px/1 weasyprint;
+            }
+            span {
+                position: note(sidenotes);
+                display: block;
+            }
+        </style>
+        <div>abc<span>de</span></div></body></html>

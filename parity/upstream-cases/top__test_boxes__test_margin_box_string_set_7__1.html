@@ -1,0 +1,10 @@
+<html><body>
+      <style>
+        img { string-set: left attr(alt) }
+        img + img { string-set: right attr(alt) }
+        @page { @top-left  { content: '[' string(left)  ']' }
+                @top-right { content: '{' string(right) '}' } }
+      </style>
+      <img src=pattern.png alt="Chocolate">
+      <img src=no_such_file.png alt="Cake">
+    </body></html>

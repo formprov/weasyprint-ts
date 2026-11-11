@@ -1,0 +1,21 @@
+<html><body>
+      <style>
+        @page {
+          size: 16px 2px;
+        }
+        body {
+          color: red;
+          font-family: weasyprint;
+          font-size: 2px;
+          line-height: 1;
+        }
+        span {
+          color: lime;
+        }
+        span::after {
+          color: blue;
+          content: leader('-');
+        }
+      </style>
+      <div>a <span>a</span> a</div>
+    </body></html>

@@ -1,0 +1,22 @@
+<html><body>
+      <style>
+        @page {
+            size: 12px 6px;
+
+            @footnote {
+                margin-left: 1px;
+                max-height: 4px;
+            }
+        }
+        div {
+            font-family: weasyprint;
+            font-size: 2px;
+            line-height: 1;
+        }
+        div.footnote {
+            float: footnote;
+        }
+      </style>
+      <div>ab<div class="footnote">c</div><div class="footnote">d</div>
+      <div class="footnote">e</div></div>
+      <div>fg</div></body></html>

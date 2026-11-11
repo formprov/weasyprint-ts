@@ -1,0 +1,21 @@
+<html><body>
+      <style>
+        @page {
+          size: 16px 6px;
+        }
+        body {
+          color: red;
+          font-family: weasyprint;
+          font-size: 2px;
+          line-height: 1;
+        }
+        div::after {
+          color: blue;
+          content: leader(' . ') 'a';
+          float: right;
+        }
+      </style>
+      <div>a</div>
+      <div>bb</div>
+      <div>c</div>
+    </body></html>

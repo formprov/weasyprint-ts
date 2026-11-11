@@ -1,0 +1,19 @@
+<!doctype html><html><head><meta charset="utf-8"><title>WeasyPrint vs weasyprint-ts</title>
+<style>
+body { font-family: -apple-system, sans-serif; background: #1e1e1e; color: #ddd; margin: 20px; }
+h1 { font-size: 20px; } h2 { font-size: 16px; margin: 30px 0 6px; }
+.badge { font-size: 12px; padding: 2px 8px; border-radius: 10px; }
+.ok { background: #1b3a1b; color: #7bd77b; } .bad { background: #4a1b1b; color: #ff9c9c; }
+.pair { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+.pair > div { text-align: center; }
+img { border: 1px solid #444; width: 45vw; max-width: 900px; height: auto; display: block; }
+a { display: block; } a:hover img { border-color: #888; }
+label { font-size: 12px; color: #aaa; display: block; margin-top: 3px; }
+.hint { color: #777; font-size: 11px; margin-bottom: 20px; }
+</style></head><body>
+<h1>WeasyPrint (Python) vs weasyprint-ts</h1>
+<p class="hint">Click any image for the full-resolution render, then use the browser zoom for detail.</p>
+<h2>flyer.html</h2><span class="badge ok">✅ pixel-identical</span>
+<div class="pair"><div><a href="flyer/python-1.png"><img src="flyer/python-1.png"></a><label>WeasyPrint — page 1</label></div><div><a href="flyer/typescript-1.png"><img src="flyer/typescript-1.png"></a><label>weasyprint-ts — page 1</label></div></div>
+<p class="hint">Generated 2026-11-06T18:09:42 by parity/side_by_side.py</p>
+</body></html>

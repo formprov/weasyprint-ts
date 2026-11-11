@@ -1,0 +1,25 @@
+<html><body>
+    <style>
+      @page {
+        size: 9px 9px;
+        @footnote {
+          max-height: 2em;
+        }
+      }
+      div {
+        color: red;
+        columns: 2;
+        column-gap: 1px;
+        font-family: weasyprint;
+        font-size: 2px;
+        line-height: 1;
+      }
+      span {
+        float: footnote;
+      }
+    </style>
+    <div>
+      a<span>de</span> a<span>de</span>
+      a<span>de</span> ab
+      ab ab
+    </div></body></html>

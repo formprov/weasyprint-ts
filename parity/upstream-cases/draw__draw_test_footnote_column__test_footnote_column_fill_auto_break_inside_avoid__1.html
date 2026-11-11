@@ -1,0 +1,27 @@
+<html><body>
+    <style>
+      @page {
+        size: 9px 13px;
+      }
+      div {
+        color: red;
+        columns: 2;
+        column-fill: auto;
+        column-gap: 1px;
+        font-family: weasyprint;
+        font-size: 2pX;
+        line-height: 1;
+      }
+      article {
+        break-inside: avoid;
+      }
+      span {
+        float: footnote;
+      }
+    </style>
+    <div>
+      <article>a<span>de</span> a<span>de</span></article>
+      <article>ab</article>
+      <article>a<span>de</span> ab</article>
+      <article>ab</article>
+    </div></body></html>

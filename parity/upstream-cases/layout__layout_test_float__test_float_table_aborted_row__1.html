@@ -1,0 +1,13 @@
+<html><body>
+      <style>
+        @page {size: 10px 7px}
+        body {font-family: weasyprint; font-size: 2px; line-height: 1}
+        div {float: right; orphans: 1}
+        td {break-inside: avoid}
+      </style>
+      <table><tbody>
+        <tr><td>abc</td></tr>
+        <tr><td>abc</td></tr>
+        <tr><td>def <div>f<br>g</div> ghi</td></tr>
+      </tbody></table>
+    </body></html>

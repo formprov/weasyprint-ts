@@ -1,0 +1,18 @@
+<html><body>
+        <style>
+            @page {
+                size: 9px 7px;
+            }
+            div {
+                font-family: weasyprint;
+                font-size: 2px;
+                line-height: 1;
+            }
+            div::after {
+                content: counter(pages);
+            }
+            span {
+                float: footnote;
+            }
+        </style>
+        <div>ab<span>de</span></div></body></html>

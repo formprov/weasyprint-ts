@@ -1,0 +1,16 @@
+<html><body>
+      <style>
+        @font-face {
+          src: url(weasyprint.otf);
+          font-family: no-kern-liga;
+          font-feature-settings: 'kern' off;
+          font-variant: no-common-ligatures;
+        }
+        @font-face {
+          src: url(weasyprint.otf);
+          font-family: kern-liga;
+        }
+        span:nth-child(1) { font-family: kern-liga }
+        span:nth-child(2) { font-family: no-kern-liga }
+      </style>
+      <span>kk liga</span><span>kk liga</span></body></html>

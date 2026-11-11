@@ -1,0 +1,30 @@
+<html><body>
+        <style>
+            @page {
+                font-family: weasyprint;
+                margin: 1px;
+                size: 6px 9px;
+                @bottom-right-corner {
+                    color: blue;
+                    content: counter(pages);
+                    font-size: 1PX;
+                }
+            }
+            body {
+                color: red;
+                font-family: weasyprint;
+                font-size: 2px;
+                line-height: 1;
+                orphans: 2;
+                widows: 2;
+            }
+            div {
+                color: blue;
+                position: absolute;
+            }
+            div ~ div {
+                color: lime;
+            }
+        </style>
+        a a a <div>a a a</div> a <div>a a a</div>
+    </body></html>

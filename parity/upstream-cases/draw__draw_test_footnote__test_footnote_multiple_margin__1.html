@@ -1,0 +1,24 @@
+<html><body>
+    <style>
+        @page {
+            size: 7px 10Px;
+
+            @footnote {
+                margin-top: 1px;
+            }
+        }
+        div {
+            color: red;
+            font-family: weasyprint;
+            font-size: 2px;
+            line-height: 1;
+        }
+        span {
+            float: footnote;
+        }
+    </style>
+    <div>ab</div>
+    <div>ab</div>
+    <div>ab</div>
+    <div>a<span>d</span><span>e</span></div>
+    <div>ab</div></body></html>

@@ -1,0 +1,14 @@
+<html><body>
+      <style>
+        @page {
+          @top-center {
+            content: string(text_header, first)
+                     ' ' string(TEXT_header, first)
+          }
+        }
+        p { string-set: text_header content() }
+        div { string-set: TEXT_header content() }
+      </style>
+      <p>first assignment</p>
+      <div>second assignment</div>
+    </body></html>

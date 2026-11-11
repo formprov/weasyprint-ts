@@ -1,0 +1,43 @@
+excluded 5 cases the oracle cannot render (parity/upstream-excluded.json)
+area            match       pixels   page-count    page-size   port-error oracle-error   both-error
+css                63            0            0            0            0            0            0
+draw              493           14            4            0            0            0            0
+layout            483            5            0            0            0            0            0
+top                56           12            0            0            0            0            0
+TOTAL            1095           31            4            0            0            0            0
+
+pixels       draw__draw_svg_test_text__test_emoji_text_svg__1  2 px differ (max 68)
+page-count   draw__draw_test_leader__test_leader_float_leader__1  10 vs 11
+pixels       draw__draw_test_leader__test_leader_inline_margin__1  6 px differ (max 179)
+pixels       draw__draw_test_leader__test_leader_inline_padding__1  6 px differ (max 179)
+pixels       draw__draw_test_leader__test_leader_margin__1  6 px differ (max 179)
+pixels       draw__draw_test_leader__test_leader_padding__1  6 px differ (max 179)
+page-count   draw__draw_test_leader__test_leader_simple__1  13 vs 14
+page-count   draw__draw_test_leader__test_leader_simple_rtl__1  15 vs 17
+pixels       draw__draw_test_leader__test_leader_too_long__1  12 px differ (max 179)
+pixels       draw__draw_test_leader__test_leader_too_long_rtl__1  25 px differ (max 179)
+page-count   draw__draw_test_leader__test_leader_zero_width_string__1  15 vs 14
+pixels       draw__draw_test_text__test_line_clamp__1  3 px differ (max 121)
+pixels       draw__draw_test_text__test_line_clamp_nested__1  3 px differ (max 121)
+pixels       draw__draw_test_text__test_line_clamp_nested_after__1  3 px differ (max 121)
+pixels       draw__draw_test_text__test_line_clamp_none__1  5 px differ (max 255)
+pixels       draw__draw_test_text__test_rtl_default_direction__1  45 px differ (max 226)
+pixels       draw__draw_test_text__test_rtl_forced_direction__1  45 px differ (max 226)
+pixels       draw__draw_test_text__test_rtl_nested_inline__1  176 px differ (max 226)
+pixels       layout__layout_test_float__test_floats_3__1  2759 px differ (max 255)
+pixels       layout__layout_test_inline__test_breaking_linebox_regression_15__1  440 px differ (max 255)
+pixels       layout__layout_test_inline__test_breaking_linebox_regression_16__1  388 px differ (max 255)
+pixels       layout__layout_test_inline__test_breaking_linebox_regression_1__1  293 px differ (max 255)
+pixels       layout__layout_test_page__test_margin_boxes_vertical_align__1  16222 px differ (max 255)
+pixels       top__test_boxes__test_page_counters__1  76 px differ (max 255)
+pixels       top__test_text__test_hyphenate_character_1__1  2160 px differ (max 255)
+pixels       top__test_text__test_hyphenate_character_2__1  2160 px differ (max 255)
+pixels       top__test_text__test_hyphenate_character_3__1  4016 px differ (max 255)
+pixels       top__test_text__test_hyphenate_character_4__1  1856 px differ (max 255)
+pixels       top__test_text__test_hyphenate_character_5__1  4982 px differ (max 255)
+pixels       top__test_text__test_hyphenate_limit_zone_1__1  2304 px differ (max 255)
+pixels       top__test_text__test_hyphenate_limit_zone_2__1  272 px differ (max 255)
+pixels       top__test_text__test_hyphenate_limit_zone_3__1  2304 px differ (max 255)
+pixels       top__test_text__test_hyphenate_limit_zone_4__1  272 px differ (max 255)
+pixels       top__test_text__test_line_break_before_trailing_space__1  743 px differ (max 255)
+pixels       top__test_text__test_text_transform__1  1938 px differ (max 255)

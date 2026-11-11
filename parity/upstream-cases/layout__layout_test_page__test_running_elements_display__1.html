@@ -1,0 +1,18 @@
+<html><body>
+      <style>
+        @page {
+          margin: 50px;
+          size: 200px;
+          @bottom-left { content: element(inline) }
+          @bottom-center { content: element(block) }
+          @bottom-right { content: element(table) }
+        }
+        table { position: running(table) }
+        div { position: running(block) }
+        span { position: running(inline) }
+      </style>
+      text
+      <table><tr><td>table</td></tr></table>
+      <div>block</div>
+      <span>inline</span>
+    </body></html>

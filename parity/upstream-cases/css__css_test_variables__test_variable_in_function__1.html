@@ -1,0 +1,13 @@
+<html><body>
+      <style>
+        html { --var: title }
+        h1 { counter-increment: var(--var) }
+        div::before { content: counter(var(--var)) }
+      </style>
+      <section>
+        <h1></h1>
+        <div></div>
+        <h1></h1>
+        <div></div>
+      </section>
+    </body></html>

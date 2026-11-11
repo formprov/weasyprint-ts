@@ -1,0 +1,25 @@
+<html><body>
+        <style>
+            @page {
+                font-family: weasyprint;
+                margin: 1px;
+                size: 6px 6px;
+                @bottom-right-corner {
+                    color: blue;
+                    content: counter(pages);
+                    font-size: 1px;
+                }
+            }
+            body {
+                color: red;
+                font-family: weasyprint;
+                font-size: 2px;
+                line-height: 1;
+            }
+            div {
+                color: blue;
+                position: absolute;
+            }
+        </style>
+        a a a <div>a a</div>
+    </body></html>

@@ -1,0 +1,30 @@
+<html><body>
+      <style>
+        @page {size: 10px 12px;}
+        div {
+          continue: discard;
+          font-family: weasyprint;
+          font-size: 2px;
+        }
+        #a {
+          color: blue;
+          max-lines: 5;
+        }
+        #b {
+          color: red
+          max-lines: 2;
+        }
+      </style>
+      <div id=a>
+        aaaaa
+        aaaaa
+        <div id=b>
+          bbbbb
+          bbbbb
+          bbbbb
+          bbbbb
+        </div>
+        aaaaa
+        aaaaa
+      </div>
+    </body></html>

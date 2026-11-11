@@ -1,0 +1,28 @@
+<html><body>
+      <style>
+        @page {
+          @top-center { content: string(text_header, first) }
+          @bottom-center { content: string(text_footer, last) }
+        }
+        html { counter-reset: a }
+        body { counter-increment: a }
+        ul { counter-reset: b }
+        li {
+          counter-increment: b;
+          string-set:
+            text_header content(before) "-" content() "-" content(after)
+                        counter(a, upper-roman) '.' counters(b, '|'),
+            text_footer content(before) '-' attr(class)
+                        counters(b, '|') "/" counter(a, upper-roman);
+        }
+        li:before { content: 'before!' }
+        li:after { content: 'after!' }
+        li:last-child:before { content: 'before!last' }
+        li:last-child:after { content: 'after!last' }
+      </style>
+      <ul>
+        <li class="firstclass">first
+        <li>
+          <ul>
+            <li class="secondclass">second
+    </body></html>

@@ -1,0 +1,15 @@
+<html><body>
+      <style>
+        div:first-child { counter-reset: div }
+        div { counter-increment: div }
+        div::before { content: target-counter(attr(data-count), div) }
+        #id2::before { content: target-counter(attr(data-count url), div) }
+        #id4::before {
+          content: target-counter(attr(data-count), div, lower-alpha) }
+      </style>
+      <body>
+        <div id="id1" data-count="#id4"></div>
+        <div id="id2" data-count="#id1"></div>
+        <div id="id3" data-count="#id2"></div>
+        <div id="id4" data-count="#id3"></div>
+    </body></html>

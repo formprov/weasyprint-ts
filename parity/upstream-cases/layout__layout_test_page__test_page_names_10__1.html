@@ -1,0 +1,17 @@
+<html><body>
+      <style>
+        #running { position: running(running); }
+        #fixed { position: fixed; }
+        @page { size: 200px 200px; @top-center { content: element(header); }}
+        section { page: small; }
+        @page small { size: 100px 100px; }
+        .pagebreak { break-after: page; }
+      </style>
+      <div id="running">running</div>
+      <div id="fixed">fixed</div>
+      <section>
+        <h1>text</h1>
+        <div class="pagebreak"></div>
+        <article>text</article>
+      </section>
+    </body></html>

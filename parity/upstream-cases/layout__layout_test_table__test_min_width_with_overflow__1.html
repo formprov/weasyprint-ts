@@ -1,0 +1,37 @@
+<html><body>
+      <style>
+        table td { border: 1px solid black }
+        table.key-val tr td:nth-child(1) { min-width: 13em }
+      </style>
+
+      <table class="key-val">
+        <tbody>
+          <tr>
+            <td>Normal Key 1</td>
+            <td>Normal Value 1</td>
+          </tr>
+          <tr>
+            <td>Normal Key 2</td>
+            <td>Normal Value 2</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table class="key-val">
+        <tbody>
+          <tr>
+            <td>Short value</td>
+            <td>Works as expected</td>
+          </tr>
+          <tr>
+            <td>Long Value</td>
+            <td>Annoyingly breaks my table layout: Sed ut perspiciatis
+                unde omnis iste natus error sit voluptatem
+                accusantium doloremque laudantium, totam rem aperiam,
+                eaque ipsa quae ab illo inventore veritatis et quasi
+                architecto beatae vitae dicta sunt explicabo.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </body></html>

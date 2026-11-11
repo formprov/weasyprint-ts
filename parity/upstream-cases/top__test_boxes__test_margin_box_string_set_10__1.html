@@ -1,0 +1,12 @@
+<html><body>
+      <style>
+        @page { @top-left  { content: '[' string(p, start) ']' } }
+        p { string-set: p content(); page-break-after: always }
+      </style>
+      <article></article>
+      <p>1</p>
+      <article></article>
+      <p>2</p>
+      <p>3</p>
+      <article></article>
+    </body></html>

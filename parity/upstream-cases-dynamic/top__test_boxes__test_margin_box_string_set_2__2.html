@@ -1,0 +1,12 @@
+<html><body>
+          <style>
+            @page {
+              @top-center { content: string(text_header) }
+            }
+            p {
+              string-set: text_header content(before);
+            }
+            p:before{content: "pseudo"}
+          </style>
+          <p>first assignment</p>
+        </body></html>

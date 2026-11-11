@@ -1,0 +1,13 @@
+<html><body>
+      <style>
+        @page { @top-left  { content: '[' string(left) ']' } }
+        p { page-break-before: always }
+        .initial { string-set: left 'initial' }
+        .empty   { string-set: left ''        }
+        .space   { string-set: left ' '       }
+      </style>
+
+      <p class="initial">Initial</p>
+      <p class="empty">Empty</p>
+      <p class="space">Space</p>
+    </body></html>

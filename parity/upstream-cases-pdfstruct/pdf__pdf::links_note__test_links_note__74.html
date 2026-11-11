@@ -1,0 +1,13 @@
+<html><body>
+      <style>
+        @page {
+          @note-area {
+            content: element(sidenotes, all-once);
+          }
+        }
+        span {
+          display: block;
+          position: note(sidenotes);
+        }
+      </style>
+      <div>abc<span>de</span>fgh<span>ij</span></div></body></html>

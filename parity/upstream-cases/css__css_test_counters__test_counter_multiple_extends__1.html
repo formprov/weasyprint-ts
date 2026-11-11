@@ -1,0 +1,42 @@
+<html><body>
+      <style>
+        @counter-style a {
+          system: extends b;
+          prefix: a;
+        }
+        @counter-style b {
+          system: extends c;
+          suffix: b;
+        }
+        @counter-style c {
+          system: extends b;
+          pad: 2 c;
+        }
+        @counter-style d {
+          system: extends d;
+          prefix: d;
+        }
+        @counter-style e {
+          system: extends unknown;
+          prefix: e;
+        }
+        @counter-style f {
+          system: extends decimal;
+          symbols: a;
+        }
+        @counter-style g {
+          system: extends decimal;
+          additive-symbols: 1 a;
+        }
+      </style>
+      <ol>
+        <li style="list-style-type: a"></li>
+        <li style="list-style-type: b"></li>
+        <li style="list-style-type: c"></li>
+        <li style="list-style-type: d"></li>
+        <li style="list-style-type: e"></li>
+        <li style="list-style-type: f"></li>
+        <li style="list-style-type: g"></li>
+        <li style="list-style-type: h"></li>
+      </ol>
+    </body></html>

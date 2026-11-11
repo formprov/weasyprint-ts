@@ -1,0 +1,19 @@
+<html><body>
+      <style>
+        @page { size: 8px }
+        svg { display: block }
+      </style>
+      <svg width="8px" height="8px" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="pat" x="0" y="0" width="50%" height="50%"
+            patternUnits="objectBoundingBox"
+            patternContentUnits="userSpaceOnUse">
+            <rect x="0" y="0" width="2" height="2" fill="blue" />
+            <rect x="0" y="2" width="2" height="2" fill="red" />
+            <rect x="2" y="0" width="2" height="2" fill="red" />
+            <rect x="2" y="2" width="2" height="2" fill="blue" />
+          </pattern>
+        </defs>
+        <rect x="0" y="0" width="8" height="8" fill="url(#pat)" />
+      </svg>
+    </body></html>

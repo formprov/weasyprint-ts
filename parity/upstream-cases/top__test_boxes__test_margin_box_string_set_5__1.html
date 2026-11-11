@@ -1,0 +1,12 @@
+<html><body>
+      <style>
+        @page {
+          @top-center { content: string(header_last, last) }
+        }
+        p {
+          string-set: header_last content();
+        }
+      </style>
+      <p>String set</p>
+      <p>Second assignment</p>
+    </body></html>

@@ -1,0 +1,39 @@
+{
+  "aliases": {
+    "arimo": "Arial",
+    "cambria": "Noto Serif",
+    "consolas": "Noto Sans Mono",
+    "courier": "Courier New",
+    "cousine": "Courier New",
+    "dejavu serif": "Noto Serif",
+    "helvetica": "Arial",
+    "liberation mono": "Courier New",
+    "liberation sans": "Arial",
+    "liberation serif": "Times New Roman",
+    "palatino": "Noto Serif",
+    "times": "Times New Roman",
+    "tinos": "Times New Roman",
+    "cursive": "Comic Sans MS",
+    "fantasy": "Impact",
+    "monospace": "Noto Sans Mono",
+    "sans-serif": "Noto Sans",
+    "serif": "Noto Serif",
+    "system-ui": "Noto Sans",
+    "helvetica neue": "Arial"
+  },
+  "fallback": [
+    "Noto Sans",
+    "Verdana",
+    "Noto Sans Math",
+    "Arial",
+    "Nimbus Sans L",
+    "Open Sans",
+    "Noto Sans Arabic",
+    "Noto Sans Symbols 2",
+    "Noto Sans Devanagari",
+    "Noto Sans CJK JP",
+    "Noto Sans Symbols",
+    "Noto Sans Thai",
+    "Trebuchet MS"
+  ]
+}

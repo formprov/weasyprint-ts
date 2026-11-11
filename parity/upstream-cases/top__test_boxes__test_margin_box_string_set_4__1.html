@@ -1,0 +1,15 @@
+<html><body>
+      <style>
+        @page {
+          @top-center { content: string(header_nofirst, first-except) }
+        }
+        p{
+          string-set: header_nofirst content();
+        }
+        .page{
+          page-break-before: always;
+        }
+      </style>
+      <p>first_excepted</p>
+      <div class="page"></div>
+    </body></html>

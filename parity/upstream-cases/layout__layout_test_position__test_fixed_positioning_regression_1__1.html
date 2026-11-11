@@ -1,0 +1,13 @@
+<html><body>
+      <style>
+        @page:first { size: 100px 200px }
+        @page { size: 200px 100px; margin: 0 }
+        article { break-after: page }
+        .fixed { position: fixed; top: 10px; width: 20px }
+      </style>
+      <ul class="fixed" style="right: 0"><li>a</li></ul>
+      <img class="fixed" style="right: 20px" src="pattern.png" />
+      <div class="fixed" style="right: 40px">b</div>
+      <article>page1</article>
+      <article>page2</article>
+    </body></html>

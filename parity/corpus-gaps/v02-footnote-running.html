@@ -1,0 +1,13 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+@page { size: 200px 160px; margin: 10px;
+  @top-center { content: string(title) }
+}
+body { font-family: "Noto Serif"; font-size: 12px; line-height: 1.4 }
+h1 { string-set: title content() }
+.fn { float: footnote }
+</style></head><body>
+<h1>Running Title</h1>
+<p>First paragraph with a note<span class="fn">Footnote text one.</span> and more words here to wrap across lines.</p>
+<p>Second paragraph<span class="fn">Footnote two.</span> continues with additional content to force a page break maybe.</p>
+<p>Third paragraph with more text to fill the page and push content onto a second page of output.</p>
+</body></html>

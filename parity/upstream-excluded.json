@@ -1,0 +1,7 @@
+{
+ "draw__draw_test_float__test_float_split_5__1": "oracle IndexError in weasyprint/layout/page.py make_page (box.children[skip]): upstream bug, reproduced in the pinned image",
+ "draw__draw_test_float__test_float_split_11__1": "oracle IndexError in weasyprint/layout/page.py make_page: upstream bug, reproduced in the pinned image",
+ "draw__draw_test_float__test_float_split_8__1": "oracle IndexError in weasyprint/layout/page.py make_page: upstream bug; the port also hangs (weasy-xcw)",
+ "draw__draw_test_float__test_float_split_9__1": "oracle IndexError in weasyprint/layout/page.py make_page: upstream bug; the port also hangs (weasy-xcw)",
+ "draw__draw_test_float__test_float_split_15__1": "oracle IndexError in weasyprint/layout/page.py make_page: upstream bug; the port also hangs (weasy-xcw)"
+}

@@ -1,0 +1,25 @@
+<html><body>
+        <style>
+            @page {
+                size: 24px 14px;
+                margin: 4px;
+                @note-area {
+                    content: element(sidenotes, all-once);
+                    float: left;
+                    margin: -2px 2px 2px -2px;
+                    width: 50%;
+                }
+            }
+            div {
+                color: red;
+                font: 2px/1 weasyprint;
+            }
+            span {
+                color: blue;
+                display: block;
+                position: note(sidenotes);
+            }
+        </style>
+        <div>abc<span>d</span>
+          fgh<span>i</span>
+          jklmn</div></body></html>

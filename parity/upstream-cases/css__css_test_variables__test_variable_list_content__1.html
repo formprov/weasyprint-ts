@@ -1,0 +1,7 @@
+<html><body>
+      <style>
+        :root { --var: "Page " counter(page) "/" counter(pages) }
+        div::before { content: var(--var) }
+      </style>
+      <div></div>
+    </body></html>

@@ -1,0 +1,18 @@
+<html><body>
+        <style>
+            @page {
+                size: 5px;
+            }
+            div {
+                font-family: weasyprint;
+                font-size: 2px;
+                line-height: 1;
+            }
+            span {
+                float: footnote;
+            }
+            a::after {
+                content: target-counter(attr(href), page);
+            }
+        </style>
+        <div><a href="#i">a</a> bb<span>de</span> <i id="i">fg</i></div></body></html>
