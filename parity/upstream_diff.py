@@ -26,9 +26,11 @@ from pathlib import Path
 
 from PIL import Image, ImageChops
 
+from oracle import image_fonts, upstream_dir
+
 REPO = Path(__file__).resolve().parent.parent
 IMAGE = 'weasy-alpine-prod:latest'
-UPSTREAM_TESTS_PARENT = Path('/Users/andy/PROJ/weasy/reference_code/WeasyPrint').resolve()  # provides the `tests` package
+UPSTREAM_TESTS_PARENT = upstream_dir(required=True)  # provides the `tests` package
 ap = argparse.ArgumentParser()
 ap.add_argument('cases')
 ap.add_argument('--area', default=None)
@@ -104,7 +106,7 @@ subprocess.run(['docker', 'run', '--rm', '-v', f'{cases_dir}:/cases:ro', '-v', f
 oracle = json.loads((out / '_oracle.json').read_text())
 
 # --- port: CLI in parallel -------------------------------------------------------------
-fonts = REPO / 'parity' / 'samples-out' / 'oracle-fonts'
+fonts = image_fonts()
 env = {'FONT_DIR': str(fonts), 'PATH': '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin', 'HOME': str(Path.home())}
 
 

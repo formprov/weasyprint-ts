@@ -21,9 +21,8 @@
   },
   "files": [
     "dist",
-    "profiles",
-    "fonts"
-],
+    "profiles"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/aceitw/weasyprint-ts.git"

@@ -55,6 +55,8 @@ def main():
     ap.add_argument('--samples', nargs='+', default=list(SAMPLES),
                     help='official samples to include (default: all)')
     ap.add_argument('-o', '--out', default=str(REPO / 'parity' / 'acceptance-out'))
+    ap.add_argument('--docker', action='store_true',
+                    help='render the repo corpus in the pinned image as well (default: local weasyprint)')
     args = ap.parse_args()
 
     out = Path(args.out).resolve()
@@ -85,7 +87,7 @@ def main():
     env = {**os.environ, **fontconf_env(str(REPO / 'test' / 'fonts'), work)}
     env['FONT_DIR'] = str(REPO / 'test' / 'fonts')
     class Args:  # diffrun's render_python/render_ts expect this shape
-        docker = False
+        docker = args.docker
         stylesheet = None
         python_cmd = 'weasyprint'
     for doc in sorted(corpus.glob('*.html')):
@@ -134,8 +136,8 @@ def main():
  .links a { margin-right: 12px }
 </style></head><body>
 <h1>weasyprint-ts — acceptance</h1>
-<p>Python WeasyPrint 70 (pinned <code>weasy-alpine-prod</code> image, or the local
-install for the repo corpus) vs this TypeScript port. Every document is rasterized
+<p>Python WeasyPrint 70 (pinned <code>weasy-alpine-prod</code> image) vs this
+TypeScript port. Every document is rasterized
 at 96 dpi; the badge is pixel parity across all pages.</p>''']
 
     current = None

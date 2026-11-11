@@ -24,10 +24,11 @@ import datetime
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+from oracle import image_fonts
 
 REPO = Path(__file__).resolve().parent.parent
 TS_CLI = REPO / 'src' / 'cli' / 'main.ts'
@@ -48,33 +49,13 @@ def detect_font_dir(corpus: Path) -> str | None:
 def image_font_pin() -> Path | None:
     """Both engines must see byte-identical font files: an unpinned fontconfig
     fallback (e.g. the host has no plain 'Noto Serif') silently changes glyph
-    advances and fabricates pixel diffs. When the corpus ships no fonts,
-    extract the pinned image's font set into a per-machine cache keyed by the
-    image id and pin to it."""
+    advances and fabricates pixel diffs. When the corpus ships no fonts, use
+    the pinned image's font set and hyphenation dictionaries, extracted once
+    into a per-machine cache (parity/oracle.py)."""
     try:
-        img_id = run(['docker', 'image', 'inspect', '-f', '{{.Id}}', IMAGE]).stdout.strip()
-    except OSError:
-        img_id = ''
-    if not img_id:
+        return image_fonts()
+    except (OSError, SystemExit):
         return None
-    cache = Path.home() / '.cache' / 'weasy-parity' / 'oracle-fonts'
-    marker = cache / '.image-id'
-    if marker.is_file() and marker.read_text().strip() == img_id \
-            and (any(cache.glob('*.ttf')) or any(cache.glob('*.otf'))):
-        return cache
-    tmp = cache.parent / f'extract-{os.getpid()}'
-    shutil.rmtree(tmp, ignore_errors=True)
-    tmp.mkdir(parents=True)
-    result = run(['docker', 'run', '--rm', '-v', f'{tmp}:/out', IMAGE, 'sh', '-c',
-                  'i=0; find /usr/share/fonts -type f \\( -name "*.ttf" -o -name "*.otf" \\) '
-                  '| while read f; do cp "$f" "/out/$(echo $f | md5sum | cut -c1-8)_$(basename "$f")"; done'])
-    if result.returncode != 0 or not (any(tmp.glob('*.ttf')) or any(tmp.glob('*.otf'))):
-        shutil.rmtree(tmp, ignore_errors=True)
-        return None
-    shutil.rmtree(cache, ignore_errors=True)
-    tmp.rename(cache)
-    marker.write_text(img_id)
-    return cache
 
 
 def fontconf_env(font_dir: str, workdir: Path, docker: bool = False) -> dict:

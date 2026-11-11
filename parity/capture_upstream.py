@@ -22,11 +22,13 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from urllib.parse import unquote
 
+from oracle import upstream_dir
+
 REPO = Path(__file__).resolve().parent.parent
-UPSTREAM = (REPO.parent / 'reference_code' / 'WeasyPrint').resolve()
 IMAGE = 'weasy-alpine-prod:latest'
 
 ap = argparse.ArgumentParser()
@@ -34,11 +36,14 @@ ap.add_argument('out', nargs='?', default=str(REPO / 'parity' / 'upstream-cases-
 ap.add_argument('--pattern', default=None, help='only capture documents from tests whose nodeid matches this regex')
 ap.add_argument('-k', dest='expr', default=None, help='pytest -k expression (test selection)')
 ap.add_argument('--dry-run', action='store_true', help='run pytest, print the capture report, write nothing')
-ap.add_argument('--from-raw', action='store_true', help='reuse the documents already captured in /tmp/ld/capture_raw')
+ap.add_argument('--raw', default=None,
+                help='scratch directory for captured documents (default: a temp directory)')
+ap.add_argument('--from-raw', action='store_true', help='reuse the documents already captured in --raw')
 args = ap.parse_args()
 
+UPSTREAM = upstream_dir(required=True)
 out = Path(args.out).resolve()
-raw = Path('/tmp/ld/capture_raw')
+raw = Path(args.raw or (Path(tempfile.gettempdir()) / 'weasy-capture-raw')).resolve()
 if not (args.from_raw and raw.exists()):
     if raw.exists():
         shutil.rmtree(raw)

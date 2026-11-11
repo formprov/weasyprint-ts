@@ -21,10 +21,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+from oracle import image_fonts, upstream_dir
+
 REPO = Path(__file__).resolve().parent.parent
 IMAGE = 'weasy-alpine-prod:latest'
-UPSTREAM = REPO.parent / 'reference_code' / 'WeasyPrint'
-FONTS = REPO / 'parity' / 'samples-out' / 'oracle-fonts'
+UPSTREAM = upstream_dir(required=True)
+FONTS = image_fonts()
 UA = 'tests_ua.css'
 IGNORED_INFO = {'/CreationDate', '/ModDate', '/Producer', '/Creator'}
 

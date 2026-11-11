@@ -8,16 +8,20 @@ Prerequisites: `weasyprint` on PATH (or --python-cmd), Ghostscript for the
 rasterization, qpdf for page counts.
 
 Usage:
-  python3 parity/side_by_side.py DOC.html [-s style.css] [-o OUT_DIR] [--python-cmd CMD]
-  python3 parity/side_by_side.py DOCS_DIR/ [-s style.css] [-o OUT_DIR]
+  python3 parity/side_by_side.py DOC.html [--docker] [-s style.css] [-o OUT_DIR]
+  python3 parity/side_by_side.py DOCS_DIR/ [--docker] [-s style.css] [-o OUT_DIR]
   python3 parity/side_by_side.py DOC.html --pagedjs     # add the Paged.js contender column
 
---pagedjs renders the document a third time with harness/render_pagedjs.mjs (the
-Paged.js polyfill in headless Chromium) and shows it beside the two WeasyPrint
-engines. Its badge is informational: WeasyPrint parity is still decided by the
-TS column. The runner needs harness/node_modules (pagedjs, playwright-core) and a
-Playwright Chromium build (override with CHROMIUM_PATH); set CALIBRATE=<oracle
-dump> for the oracle-calibrated variant described in the README score table.
+--docker renders the Python side in the pinned weasy-alpine-prod image (built
+on first use), so the comparison is against the exact Pango/HarfBuzz/font set
+the project measures parity on, not a local pip install.
+
+--pagedjs renders the document a third time with parity/pagedjs/render_pagedjs.mjs
+(the Paged.js polyfill in headless Chromium) and shows it beside the two
+WeasyPrint engines. Its badge is informational: WeasyPrint parity is still
+decided by the TS column. Install its dependencies first (cd parity/pagedjs &&
+npm install); set CHROMIUM_PATH to point at a Chromium build, and
+CALIBRATE=<oracle dump> for the oracle-calibrated variant in the README table.
 """
 
 import argparse
@@ -26,39 +30,63 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
+
+from diffrun import fontconf_env
+from oracle import IMAGE, image_fonts
 
 REPO = Path(__file__).resolve().parent.parent
 TS_CLI = REPO / 'src' / 'cli' / 'main.ts'
 
 
-def detect_font_dir(src: Path) -> str | None:
-    """Pin both engines to the corpus's own fonts when present (zero-config parity)."""
+def detect_font_dir(src: Path, docker: bool = False, image_dir: str | None = None) -> str | None:
+    """Pin both engines to the same font files.
+
+    A corpus that ships its own `fonts/` keeps them. Otherwise the docker
+    oracle uses the image's font set (extracted once), and a local run falls
+    back to the repo's test fonts, which is what the committed examples use.
+    """
     base = src.parent if src.is_file() else src
-    candidates = (base / 'fonts', base.parent / 'fonts', REPO / 'test' / 'fonts')
-    for candidate in candidates:
+    for candidate in (base / 'fonts', base.parent / 'fonts'):
         if candidate.is_dir() and any(candidate.glob('*.ttf')):
             return str(candidate)
-    return None
-
-
-def fontconf_env(font_dir: str | None, workdir: Path) -> dict:
-    if not font_dir:
-        return {}
-    cache = Path(tempfile.mkdtemp(prefix='weasyprint-ts-fc-'))
-    conf = cache / 'fonts.conf'
-    conf.write_text(
-        '<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">\n'
-        f'<fontconfig><dir>{font_dir}</dir><cachedir>{cache}</cachedir></fontconfig>\n')
-    return {'FONTCONFIG_FILE': str(conf), 'FONT_DIR': font_dir}
+    if docker:
+        return image_dir or str(image_fonts())
+    fallback = REPO / 'test' / 'fonts'
+    return str(fallback) if fallback.is_dir() else None
 
 
 def run(cmd, **kw):
     return subprocess.run(cmd, capture_output=True, text=True, **kw)
 
 
+def _mount(cmd: list[str], path: Path, mount: str) -> str:
+    """Host path inside the oracle container: repo paths are already mounted
+    at their own location, anything else gets a read-only mount."""
+    path = path.resolve()
+    if path.is_relative_to(REPO):
+        return str(path)
+    cmd += ['-v', f'{path.parent}:{mount}:ro']
+    return f'{mount}/{path.name}'
+
+
 def render_python(doc: Path, out: Path, args, env) -> subprocess.CompletedProcess:
+    if args.docker:
+        out = out.resolve()
+        cmd = ['docker', 'run', '--rm', '-v', f'{REPO}:{REPO}:ro', '-v', f'{out.parent}:/out']
+        font_dir = env.get('FONT_DIR')
+        if font_dir:
+            cmd += ['-v', f'{font_dir}:{font_dir}:ro']
+        conf = env.get('FONTCONFIG_FILE')
+        if conf:
+            cmd += ['-v', f'{conf}:/fc.conf:ro', '-e', 'FONTCONFIG_FILE=/fc.conf']
+        options = []
+        if args.stylesheet:
+            options += ['-s', _mount(cmd, Path(args.stylesheet), '/css')]
+        doc_path = _mount(cmd, doc, '/docs')
+        cmd += [IMAGE, '/venv/bin/python', '-m', 'weasyprint', *options,
+                doc_path, f'/out/{out.name}']
+        return run(cmd)
     cmd = args.python_cmd.split()
     if cmd[0].endswith(('python', 'python3')):
         cmd += ['-m', 'weasyprint']
@@ -77,10 +105,11 @@ def render_ts(doc: Path, out: Path, args, env) -> subprocess.CompletedProcess:
 def render_pagedjs(doc: Path, out: Path, args, env) -> subprocess.CompletedProcess:
     """Third contender: the Paged.js polyfill in headless Chromium.
 
-    Runs harness/render_pagedjs.mjs (see the module comment there: font pinning,
-    the WeasyPrint-70 quirk shims and the optional CALIBRATE=oracle-dump loop).
-    The runner needs harness/node_modules (pagedjs, playwright-core) and a
-    Chromium build; a failure is reported but never fails the TS comparison.
+    Runs parity/pagedjs/render_pagedjs.mjs (see the module comment there: font
+    pinning, the WeasyPrint-70 quirk shims and the optional CALIBRATE=oracle-dump
+    loop). The runner needs parity/pagedjs/node_modules (pagedjs,
+    playwright-core) and a Chromium build; a failure is reported but never fails
+    the TS comparison.
     """
     runner = Path(args.pagedjs_runner).resolve()
     cmd = ['node', str(runner)]
@@ -120,10 +149,12 @@ def main():
     ap.add_argument('-s', '--stylesheet', default=None)
     ap.add_argument('-o', '--out', default=None)
     ap.add_argument('--python-cmd', default='weasyprint')
+    ap.add_argument('--docker', action='store_true',
+                    help='render the Python side in the pinned weasy-alpine-prod image')
     ap.add_argument('--pagedjs', action='store_true',
-                    help='add the Paged.js contender column (Chromium via harness/render_pagedjs.mjs)')
-    ap.add_argument('--pagedjs-runner', default=str(REPO.parent / 'harness' / 'render_pagedjs.mjs'),
-                    help='Paged.js runner script (default: harness/render_pagedjs.mjs)')
+                    help='add the Paged.js contender column (Chromium via parity/pagedjs/)')
+    ap.add_argument('--pagedjs-runner', default=str(REPO / 'parity' / 'pagedjs' / 'render_pagedjs.mjs'),
+                    help='Paged.js runner script (default: parity/pagedjs/render_pagedjs.mjs)')
     args = ap.parse_args()
 
     src = Path(args.input).resolve()
@@ -139,7 +170,16 @@ def main():
         out_dir = src.parent / f'sbs-{src.name}'
     out_dir = out_dir.resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
-    env = {**dict(os.environ), **fontconf_env(detect_font_dir(src), out_dir)}
+    image_dir = str(image_fonts()) if args.docker else None
+    font_dir = detect_font_dir(src, args.docker, image_dir)
+    env = {**dict(os.environ)}
+    if font_dir:
+        env['FONT_DIR'] = font_dir
+        # A custom fontconfig is only needed when the fonts are not the
+        # image's own set: the image's default config already defines the
+        # generic families the port's alpine_prod profile expects.
+        if font_dir != image_dir:
+            env.update(fontconf_env(font_dir, out_dir, args.docker))
 
     sections = []
     failures = 0

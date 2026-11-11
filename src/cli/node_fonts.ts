@@ -70,20 +70,11 @@ function systemFontDirs(): string[] {
 }
 
 /** Default font directories, in priority order: FONT_DIR (colon-separated)
- * wins; then any `fonts/prod` found walking up from the package (the pinned
- * production set of the comparison-tool workspace); then the system font
- * directories, mirroring fontconfig's default discovery. */
+ * when set; then the system font directories, mirroring fontconfig's default
+ * discovery. Nothing outside the package is scanned by convention. */
 export function defaultFontDirs(): string[] {
   const dirs: string[] = [];
   if (process.env.FONT_DIR) dirs.push(...process.env.FONT_DIR.split(':').filter(Boolean));
-  let dir = new URL('../..', import.meta.url).pathname; // package root
-  for (let up = 0; up < 4; up++) {
-    const candidate = join(dir, 'fonts/prod');
-    try {
-      if (statSync(candidate).isDirectory()) { dirs.push(candidate); break; }
-    } catch { /* keep walking */ }
-    dir = join(dir, '..');
-  }
   dirs.push(...systemFontDirs());
   return dirs;
 }

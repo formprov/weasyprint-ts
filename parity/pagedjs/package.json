@@ -1,0 +1,12 @@
+{
+  "name": "weasyprint-ts-pagedjs-harness",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Optional Paged.js contender column for parity/side_by_side.py",
+  "license": "BSD-3-Clause",
+  "dependencies": {
+    "pagedjs": "^0.4.3",
+    "playwright": "^1.65.0"
+  }
+}
