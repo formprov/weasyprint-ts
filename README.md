@@ -222,7 +222,7 @@ minutes if you want to see what day-to-day parity work is made of:
   The oracle is never approximated: for both engines every check re-renders
   real WeasyPrint, byte-for-byte.
 - **The harnesses.** `parity/diffrun.py` compares a corpus (page counts,
-  layout box trees, pixel rasters, PDF structure). `parity/upstream_diff.py`
+  pixel rasters, and layout box trees with `--layout`). `parity/upstream_diff.py`
   scores the upstream banks. `parity/pdf_struct_diff.py` compares PDF objects
   item by item. `parity/side_by_side.py` gives a human view for any document.
 - **What gets compared**, for every case: page count, page size, the laid-out
