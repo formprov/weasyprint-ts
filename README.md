@@ -244,7 +244,7 @@ minutes if you want to see what day-to-day parity work is made of:
 
 ## Coverage
 
-Both measures against the same pinned oracle the section above describes.
+Both are measured against the same pinned oracle the section above describes.
 
 **Official WeasyPrint samples** (`parity/run_samples.py`): all 8 documents grade **A** in every
 category (pages, fonts, palette, images, text, links, pixels).
@@ -254,7 +254,8 @@ holds 3,044 documents: 1,135 extracted from upstream's own suite inputs and
 1,909 captured by *running* upstream's pytest suite in the oracle container
 (the tests build HTML dynamically, so the harness records what really gets
 rendered, including per-case options). A case passes when page count, page
-size, every pixel at 96 dpi and the PDF structure match the oracle.
+size and every pixel at 96 dpi match the oracle; the PDF-structure bank is
+compared separately by `parity/pdf_struct_diff.py`.
 
 | Area | Matching | Cases |
 |---|---|---|
