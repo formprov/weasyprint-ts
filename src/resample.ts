@@ -3,8 +3,9 @@
 /**
  * Pillow's Image.thumbnail for 8-bit interleaved images (BICUBIC, reducing_gap=2.0), as used by
  * weasyprint's --dpi: size selection, box-average pre-reduce, then the two-pass fixed-point resample.
- * Mirrors Pillow's Resample.c / Reduce.c. RGBA/LA are resampled on straight channels (Pillow premultiplies;
- * differs by +-1 on semi-transparent edges). JPEG draft-mode DCT scaling is not reproduced.
+ * Mirrors Pillow's Resample.c / Reduce.c. RGBA/LA are premultiplied to RGBa/La before resampling and
+ * converted back afterwards, exactly like Pillow's Image.resize. JPEG draft-mode DCT scaling is not
+ * reproduced.
  */
 
 const PRECISION_BITS = 32 - 8 - 2;
@@ -123,10 +124,66 @@ export function thumbnailSize(width: number, height: number, x: number, y: numbe
   return [x, y];
 }
 
+/** Pillow's MULDIV255 (ImagingUtils.h): round(a * b / 255). */
+function mulDiv255(a: number, b: number): number {
+  const tmp = a * b + 128;
+  return ((tmp >> 8) + tmp) >> 8;
+}
+
+/** Pillow's RGB->RGBa and L->La (rgbA2rgba / lA2la): rounded multiply by alpha. */
+function premultiply(data: Uint8Array, channels: number): Uint8Array {
+  const out = new Uint8Array(data.length);
+  if (channels === 4) {
+    for (let i = 0; i < data.length; i += 4) {
+      const alpha = data[i + 3];
+      out[i] = mulDiv255(data[i], alpha);
+      out[i + 1] = mulDiv255(data[i + 1], alpha);
+      out[i + 2] = mulDiv255(data[i + 2], alpha);
+      out[i + 3] = alpha;
+    }
+  } else {
+    for (let i = 0; i < data.length; i += 2) {
+      const alpha = data[i + 1];
+      out[i] = mulDiv255(data[i], alpha);
+      out[i + 1] = alpha;
+    }
+  }
+  return out;
+}
+
+/**
+ * Pillow's RGBa->RGB and La->L (rgba2rgbA / la2lA): truncating divide by alpha,
+ * with fully opaque and fully transparent pixels copied unchanged.
+ */
+function unpremultiply(data: Uint8Array, channels: number): Uint8Array {
+  const out = new Uint8Array(data.length);
+  const un = (value: number, alpha: number): number =>
+    alpha === 255 || alpha === 0 ? value : Math.min(255, Math.trunc(255 * value / alpha));
+  if (channels === 4) {
+    for (let i = 0; i < data.length; i += 4) {
+      const alpha = data[i + 3];
+      out[i] = un(data[i], alpha);
+      out[i + 1] = un(data[i + 1], alpha);
+      out[i + 2] = un(data[i + 2], alpha);
+      out[i + 3] = alpha;
+    }
+  } else {
+    for (let i = 0; i < data.length; i += 2) {
+      const alpha = data[i + 1];
+      out[i] = un(data[i], alpha);
+      out[i + 1] = alpha;
+    }
+  }
+  return out;
+}
+
 export function thumbnail(data: Uint8Array, width: number, height: number, channels: number, x: number, y: number):
   { data: Uint8Array; width: number; height: number } {
   const size = thumbnailSize(width, height, x, y);
   if (!size || (size[0] === width && size[1] === height)) return { data, width, height };
+  // Pillow converts LA/RGBA to premultiplied La/RGBa before resizing (Image.resize).
+  const premultiplied = channels === 2 || channels === 4;
+  if (premultiplied) data = premultiply(data, channels);
   const [ow, oh] = size;
   let src = data, w = width, h = height;
   let box: [number, number, number, number] = [0, 0, width, height];
@@ -149,5 +206,6 @@ export function thumbnail(data: Uint8Array, width: number, height: number, chann
   let cur = src, curW = w, curH = h;
   if (needH) { cur = resampleHorizontal(cur, curW, curH, channels, ow, precomputeCoeffs(curW, box[0], box[2], ow)); curW = ow; }
   if (needV) { cur = resampleVertical(cur, curW, channels, oh, precomputeCoeffs(curH, box[1], box[3], oh)); curH = oh; }
+  if (premultiplied) cur = unpremultiply(cur, channels);
   return { data: cur, width: curW, height: curH };
 }
