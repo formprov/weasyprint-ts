@@ -22,7 +22,7 @@ Source of truth: `reference_code/WeasyPrint/weasyprint/__main__.py` and `DEFAULT
 | `-p/--presentational-hints` | ok | |
 | `--optimize-images` | ok | |
 | `-j/--jpeg-quality` | ok | |
-| `-D/--dpi` | ok (PNG/GIF/BMP/TIFF/WebP/gray byte-exact vs oracle; JPEG sizes exact but pixels differ slightly: Pillow's draft-mode DCT scaling not reproduced; RGBA straight-alpha resample) | warned and ignored; needs Pillow-exact resampling |
+| `-D/--dpi` | ok (PNG/GIF/BMP/TIFF/WebP and RGBA/LA byte-exact vs oracle; JPEG sizes exact, pixels differ slightly because Pillow's draft-mode DCT-scaled decode is not reproduced — tracked in weasy-vej) | warned and ignored; needs Pillow-exact resampling |
 | `--full-fonts` | ok | |
 | `--hinting` | accepted, no effect | |
 | `-c/--cache-folder` | accepted, no effect | output-neutral |
