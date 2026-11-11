@@ -39,7 +39,7 @@ def main():
     work.mkdir(exist_ok=True)
     rows = []
     failures = 0
-    env = dict(PATH='/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin')
+    env = {**dict(__import__('os').environ), 'PATH': '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin'}
     for html in htmls:
         production = html.with_suffix('.pdf')
         if not production.exists():
@@ -55,9 +55,9 @@ def main():
             rows.append((html.name, 'FAIL', 'render failed: ' + (r.stderr.strip().splitlines()[-1] if r.stderr else '')))
             failures += 1
             continue
-        cmp = subprocess.run([sys.executable, str(ROOT / 'harness/cmp_pdf.py'), str(out_pdf), str(production)],
+        cmp = subprocess.run([sys.executable, str(ROOT / 'parity/cmp_pdf.py'), str(out_pdf), str(production)],
                              capture_output=True, text=True)
-        chk = subprocess.run([sys.executable, str(ROOT / 'harness/check_pdf.py'), str(production), str(out_pdf)],
+        chk = subprocess.run([sys.executable, str(ROOT / 'parity/check_pdf.py'), str(production), str(out_pdf)],
                              capture_output=True, text=True)
         pixel_ok = 'differing pixels 0' in cmp.stdout
         struct_ok = 'STRUCTURALLY IDENTICAL' in chk.stdout
