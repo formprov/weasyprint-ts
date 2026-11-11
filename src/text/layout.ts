@@ -18,6 +18,18 @@ import { pyRound } from '../utils.ts';
 
 /** Characters Pango's itemizer assigns no font (controls, formats, surrogates, line/paragraph/space separators). */
 const NO_FONT = /^[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}\p{Zs}]$/u;
+const LOWERCASE = /^\p{Ll}$/u;
+const SPACEISH = /^[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}\p{Zs}]$/u;
+/** Pango itemize.c consider_as_space + g_unichar_islower: the lowercase segment of a caps run. */
+const isLowerOrSpace = (cp: number): boolean => {
+  const ch = String.fromCodePoint(cp);
+  return LOWERCASE.test(ch) || (cp !== 0x1680 && SPACEISH.test(ch));
+};
+/** Pango's text-transform: uppercase, keeping one code point (the corpus never needs multi-char maps). */
+const upperCodePoint = (cp: number): number => {
+  const upper = String.fromCodePoint(cp).toUpperCase();
+  return upper.codePointAt(0) ?? cp;
+};
 const ARABIC = /[\p{Script=Arabic}\p{Script=Syriac}\p{Script=Nko}\p{Script=Thaana}]/u;
 const HEBREW = /\p{Script=Hebrew}/u;
 
@@ -310,6 +322,7 @@ export class Layout {
   private wrap: WrapMode = PANGO_WRAP.WORD;
   private faces: FontFace[] = [];
   private size = 0;
+  private capsVariant = 'normal';
   private features: Record<string, number> = {};
   private cps: number[] = [];
   private attrs: LogAttr[] = [];
@@ -356,6 +369,7 @@ export class Layout {
       this.faces = [notdefFace()];
     }
     this.size = Math.trunc(style.get('font_size') * TO_UNITS);
+    this.capsVariant = style.get('font_variant_caps') as string;
     this.features = fontFeaturesOf(style);
     if (style.get('text_decoration_line') !== 'none') {
       const face = this.faces[0];
@@ -601,28 +615,81 @@ export class Layout {
       const rtl = it.level % 2 === 1;
       // Pango shapes with the font's own features (fontconfig) first, then the style's, which win.
       const features = Object.keys(face.features).length ? { ...face.features, ...this.features } : this.features;
-      const glyphs = cps.length === 1 && cps[0] === 0x09
-        ? [{ gid: PANGO_GLYPH_EMPTY, advance: 0, xOffset: 0, yOffset: 0, cluster: 0, clusterLength: 1 }] // see resolveTabs
-        : shapeRun(face, cps, this.size, features, false, rtl, scriptTag(cps));
-      // Pango itemizes U+2028 and U+2029 as zero-width: they never shape through the font's
-      // cmap; they always render as unknown glyphs at the approximate char width (verified
-      // against the oracle with fonts whose cmap DOES contain uni2028).
-      for (const g of glyphs) {
-        const cp = cps[g.cluster];
-        if (cp === 0x2028 || cp === 0x2029) {
-          g.gid = PANGO_GLYPH_UNKNOWN_FLAG | cp;
-          g.advance = approxCharWidth(face);
+      const shapeSegment = (segCps: number[], size: number, segStart: number, segEnd: number): void => {
+        const glyphs = segCps.length === 1 && segCps[0] === 0x09
+          ? [{ gid: PANGO_GLYPH_EMPTY, advance: 0, xOffset: 0, yOffset: 0, cluster: 0, clusterLength: 1 }] // see resolveTabs
+          : shapeRun(face, segCps, size, features, false, rtl, scriptTag(segCps));
+        // Pango itemizes U+2028 and U+2029 as zero-width: they never shape through the font's
+        // cmap; they always render as unknown glyphs at the approximate char width (verified
+        // against the oracle with fonts whose cmap DOES contain uni2028).
+        for (const g of glyphs) {
+          const cp = segCps[g.cluster];
+          if (cp === 0x2028 || cp === 0x2029) {
+            g.gid = PANGO_GLYPH_UNKNOWN_FLAG | cp;
+            g.advance = approxCharWidth(face);
+          }
         }
+        const spaced = this.applySpacing(glyphs, segStart, segEnd);
+        const positioned = spaced.map((g) => ({ ...g, cluster: g.cluster + segStart }));
+        if (rtl) positioned.reverse(); // visual order, as HarfBuzz returns right-to-left glyph strings
+        runs.push({
+          face, size, glyphs: positioned, start: segStart, end: segEnd, byteOffset: this.byteOffsets[segStart],
+          byteLength: this.byteOffsets[segEnd] - this.byteOffsets[segStart], level: it.level,
+        });
+      };
+
+      const caps = this.capsSynthesis(face);
+      if (caps) {
+        // Split into lowercase/uppercase runs and uppercase+scale the lowercase ones,
+        // exactly like Pango's split_item_for_variant.
+        let pos = 0;
+        while (pos < cps.length) {
+          const lower = isLowerOrSpace(cps[pos]);
+          let end = pos + 1;
+          while (end < cps.length && isLowerOrSpace(cps[end]) === lower) end++;
+          const segCps = cps.slice(pos, end);
+          let size = this.size;
+          if (lower) {
+            if (caps.lowerTransform) for (let k = 0; k < segCps.length; k++) segCps[k] = upperCodePoint(segCps[k]);
+            if (caps.lowerScale) size = Math.round(size * caps.scale);
+          } else if (caps.upperScale) size = Math.round(size * caps.scale);
+          shapeSegment(segCps, size, it.start + pos, it.start + end);
+          pos = end;
+        }
+        continue;
       }
-      const spaced = this.applySpacing(glyphs, it.start, it.end);
-      const positioned = spaced.map((g) => ({ ...g, cluster: g.cluster + it.start }));
-      if (rtl) positioned.reverse(); // visual order, as HarfBuzz returns right-to-left glyph strings
-      runs.push({
-        face, size: this.size, glyphs: positioned, start: it.start, end: it.end, byteOffset: this.byteOffsets[it.start],
-        byteLength: this.byteOffsets[it.end] - this.byteOffsets[it.start], level: it.level,
-      });
+      shapeSegment(cps, this.size, it.start, it.end);
     }
     return runs;
+  }
+
+  /**
+   * Pango's synthetic caps (itemize.c split_item_for_variant): when the face
+   * lacks the OpenType features for the variant, lowercase runs are
+   * uppercased and scaled by x-height/cap-height (and uppercase runs are
+   * scaled for all-* and unicase), like Pango's PANGO_FONT_SCALE_SMALL_CAPS.
+   */
+  private capsSynthesis(face: FontFace): {
+    lowerTransform: boolean; lowerScale: boolean; upperScale: boolean; scale: number;
+  } | null {
+    const variant = this.capsVariant;
+    if (variant === 'normal' || variant === 'titling-caps') return null;
+    const tags = CAPS_KEYS[variant];
+    if (!tags) return null;
+    const list = (face.fk as any).GSUB?.featureList;
+    if (list) {
+      const have = new Set(list.map((f: any) => f.tag));
+      if (tags.every((tag: string) => have.has(tag))) return null;
+    }
+    const os2 = (face.fk as any)['OS/2'];
+    const scale = os2?.xHeight && os2?.capHeight ? os2.xHeight / os2.capHeight : 0.8;
+    const lowerTransform = variant === 'small-caps' || variant === 'petite-caps' ||
+      variant === 'all-small-caps' || variant === 'all-petite-caps';
+    return {
+      lowerTransform, lowerScale: lowerTransform,
+      upperScale: variant === 'all-small-caps' || variant === 'all-petite-caps' || variant === 'unicase',
+      scale,
+    };
   }
 
   /** Letter spacing and word spacing as Pango applies them (half before, half after each glyph). */
@@ -698,6 +765,23 @@ export class Layout {
     return [line, next];
   }
 
+  /** Advance of the hyphen Pango draws when it breaks at a soft hyphen (U+2010, else the CSS character). */
+  private hyphenAdvanceCache: number | null = null;
+  private hyphenAdvance(): number {
+    if (this.hyphenAdvanceCache !== null) return this.hyphenAdvanceCache;
+    const styleChar = [...String(this.style.get('hyphenate_character'))].map((c) => c.codePointAt(0)!)[0];
+    for (const cp of [0x2010, styleChar, 0x2d]) {
+      const face = this.faces.find((f) => f.hasGlyph(cp));
+      if (face) {
+        this.hyphenAdvanceCache = shapeRun(face, [cp], this.size, this.features)
+          .reduce((sum, g) => sum + g.advance, 0);
+        return this.hyphenAdvanceCache;
+      }
+    }
+    this.hyphenAdvanceCache = 0;
+    return 0;
+  }
+
   /** Line starting at code point `from` in paragraph `pi`, and the start byte of the following line. */
   private lineAt(pi: number, from: number): [Line, number | null] {
     const para = this.paragraphs[pi];
@@ -719,7 +803,10 @@ export class Layout {
       const candidates = this.breakCandidates(para, from);
       let chosen = -1;
       for (const pos of candidates) {
-        if (this.measure(para.runs, from, pos, false) <= max) chosen = pos;
+        // Pango breaks after a soft hyphen only when the hyphen itself fits: the
+        // SHY shapes to a zero-width empty glyph, so add the hyphen's advance.
+        const extra = pos > from && this.cps[pos - 1] === 0xad ? this.hyphenAdvance() : 0;
+        if (this.measure(para.runs, from, pos, false) + extra <= max) chosen = pos;
         else break;
       }
       if (this.measure(para.runs, from, para.end, false) <= max) chosen = -2; // all fits (trailing spaces count, as in Pango)

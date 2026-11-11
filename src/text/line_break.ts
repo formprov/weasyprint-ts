@@ -3,6 +3,7 @@
 /** Decide where to break text lines (mirrors weasyprint/text/line_break.py). */
 import type { Style } from '../css/style.ts';
 import { hooks } from '../css/hooks.ts';
+import { checkMath } from '../css/math.ts';
 import { percentage } from '../layout/percent.ts';
 import { Hyphenator } from './hyphenator.ts';
 import { FROM_UNITS, Layout, PANGO_WRAP, TO_UNITS, getLogAttrsForText } from './layout.ts';
@@ -341,7 +342,15 @@ function fontStyleCacheKey(style: Style, includeSize = false): string {
     style.get('font_feature_settings'), style.get('font_variation_settings'), style.get('font_language_override'),
     style.get('lang'),
   ]);
-  if (includeSize) key += String(style.get('font_size')) + String(style.get('line_height'));
+  if (includeSize) {
+    // line-height is a Dimension object; String() would collapse every length to
+    // '[object Object]' and reuse the first style's strut (inline-table baseline).
+    const size = style.get('line_height');
+    const value = size && typeof size === 'object'
+      ? ('value' in size && 'unit' in size ? `${size.value}${size.unit}` : JSON.stringify(size))
+      : String(size);
+    key += `${String(style.get('font_size'))}|${value}`;
+  }
   return key;
 }
 
@@ -362,7 +371,9 @@ export function strut(style: Style): [number, number] {
     return result;
   }
   let lineHeight = style.get('line_height');
-  if (typeof lineHeight === 'number') lineHeight *= style.get('font_size');
+  // Percentages in a line-height math function refer to the font size.
+  if (checkMath(lineHeight)) lineHeight = percentage(lineHeight, style, style.get('font_size'));
+  else if (typeof lineHeight === 'number') lineHeight *= style.get('font_size');
   else lineHeight = lineHeight.value;
   const result: [number, number] = [lineHeight, baseline + (lineHeight - textHeight) / 2];
   fontConfig.strutLayouts.set(key, result);
