@@ -23,6 +23,13 @@ export class SvgImage {
       // fallback, so silently accepting a PNG/AVIF/JPEG2000 payload would drop the image and suppress
       // the raster decoder's error instead of reporting it.
       const text = new TextDecoder('utf-8').decode(source);
+      // ElementTree rejects anything that is not well-formed XML. The HTML
+      // parser below is lenient, so require a closed (or self-closing) root
+      // first: an unclosed `<svg>...` must fall through to the alt text.
+      const trimmed = text.trim();
+      if (!/<\/svg\s*>\s*$/.test(trimmed) && !/\/>\s*$/.test(trimmed)) {
+        throw new Error('Invalid SVG image: not well-formed XML');
+      }
       const doc = parseHtml(text.includes('<html') ? text : `<html><body>${text}</body></html>`);
       const svgRoot = findSvgRoot(doc);
       if (!svgRoot) throw new Error('Invalid SVG image: no <svg> root element');

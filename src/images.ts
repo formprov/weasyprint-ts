@@ -245,6 +245,8 @@ export class RasterImage {
   private pixels: { mode: string; data: Uint8Array } | null = null;
   private dpi: number | null;
   private optimize: boolean;
+  /** The JPEG re-save path already transposed the pixels (EXIF or CSS angle). */
+  private orientationApplied = false;
 
   constructor(id: string, data: Uint8Array, mimeType: string | null = null, jpegQuality: number | null = null,
     optimize = false, dpi: number | null = null, orientation: unknown = 'from-image') {
@@ -287,6 +289,7 @@ export class RasterImage {
     } else if (this.format === 'JPEG' && (hasExifSegment(data) || jpegQuality !== null || optimize)) {
       // Upstream re-saves a JPEG that has EXIF (orientation) or an explicit jpeg_quality. Files the
       // decoder cannot handle (arithmetic coding, odd component layouts) keep their original bytes.
+      this.orientationApplied = true;
       try {
         // The orientation (if any) is applied INSIDE this one decode+transpose+encode pass:
         // Pillow transposes the Pillow image, then saves once — double encoding would drift.
@@ -319,6 +322,10 @@ export class RasterImage {
     } else if (Array.isArray(orientation)) {
       fullOps = orientationToOps(orientation, null);
     }
+    // The re-save above already transposed the pixels (orientationToOps includes the CSS
+    // angle), exactly like Pillow's single rotate_pillow_image + save. Rotating again here
+    // would cancel a 180deg angle back to the original orientation.
+    if (this.orientationApplied) fullOps = [];
     if (fullOps.length) {
       // A JPEG with a CSS angle (and no earlier exif/quality re-save) re-saves upstream too
       // (image_data = none) — rotate inside the re-save.
