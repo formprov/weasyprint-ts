@@ -12,12 +12,12 @@ import { decode as decodePng } from 'fast-png';
 import type { FetchResult } from './fetch.ts';
 import { md5HexText } from './md5.ts';
 import { LOGGER } from './logger.ts';
-import { decodeJpegLibjpeg } from './jpeg/decode.ts';
+import { JpegTruncatedError, decodeJpegLibjpeg } from './jpeg/decode.ts';
 import { decodeGif } from './gif.ts';
 import { decodeBmp } from './bmp.ts';
 import { decodeTiff } from './tiff.ts';
 import { decodeWebpLossless } from './webp.ts';
-import { encodeJpegGrayscale, encodeJpegLibjpeg } from './jpeg/encode.ts';
+import { encodeJpegCmyk, encodeJpegGrayscale, encodeJpegLibjpeg } from './jpeg/encode.ts';
 import { Dictionary, PdfArray, Stream } from './pdf/pydyf.ts';
 import { SvgImage } from './svg/image.ts';
 
@@ -63,6 +63,12 @@ export function readImageSize(data: Uint8Array): ImageSize {
       if (marker === 0xff) { i++; continue; }
       if (marker === 0xee) adobe = true;
       if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+        // Pillow's JpegImageFile._open rejects these outright, so the oracle never draws such
+        // an image (weasyprint logs "Failed to load image" and skips it).
+        if (data[i + 4] !== 8) throw new ImageLoadingError(`cannot handle ${data[i + 4]}-bit layers`);
+        if (data[i + 9] !== 1 && data[i + 9] !== 3 && data[i + 9] !== 4) {
+          throw new ImageLoadingError(`cannot handle ${data[i + 9]}-layer images`);
+        }
         return { height: v.getUint16(i + 5), width: v.getUint16(i + 7), format: 'JPEG', components: data[i + 9], adobe };
       }
       if (marker === 0xd8 || (marker >= 0xd0 && marker <= 0xd7) || marker === 0x01) { i += 2; continue; }
@@ -107,17 +113,23 @@ function hasExifSegment(data: Uint8Array): boolean {
 function reencodeExifJpeg(data: Uint8Array, id: string, quality = 75, ops: string[] = []): Uint8Array {
   try {
     const decoded = decodeJpegLibjpeg(data);
+    const channels = decoded.channels ?? 3;
+    const mode = channels === 1 ? 'L' : channels === 4 ? 'CMYK' : 'RGB';
     let pixels = decoded.data;
     let width = decoded.width;
     let height = decoded.height;
     for (const op of ops) {
-      const t = transposePixels('RGB', pixels, width, height, op);
+      const t = transposePixels(mode, pixels, width, height, op);
       pixels = t.data; width = t.width; height = t.height;
     }
-    // A gray JPEG is re-saved as gray (Pillow keeps the 'L' mode), colour as colour.
-    if (decoded.channels === 1) return encodeJpegGrayscale(pixels, width, height, quality);
+    // Pillow keeps the mode: 'L' saves gray, 'CMYK' saves 4-component JPEG, else RGB.
+    if (channels === 1) return encodeJpegGrayscale(pixels, width, height, quality);
+    if (channels === 4) return encodeJpegCmyk(pixels, width, height, quality);
     return encodeJpegLibjpeg(pixels, width, height, quality);
   } catch (error) {
+    // Pillow raises on a truncated stream (its exif_transpose loads the pixels), so upstream
+    // drops the image instead of embedding it; only unsupported layouts keep the original bytes.
+    if (error instanceof JpegTruncatedError) throw new ImageLoadingError(error.message);
     LOGGER.warning(`EXIF JPEG ${id} kept as-is: ${(error as Error).message}`);
     return data;
   }
@@ -273,8 +285,8 @@ export class RasterImage {
       this.pixels = { mode: decoded.mode, data: decoded.data };
       this.format = 'PNG';
     } else if (this.format === 'JPEG' && (hasExifSegment(data) || jpegQuality !== null || optimize)) {
-      // Upstream re-saves a JPEG that has EXIF (orientation) or an explicit jpeg_quality. Formats the decoder does
-      // not handle (CMYK, progressive variants it lacks) keep their original bytes.
+      // Upstream re-saves a JPEG that has EXIF (orientation) or an explicit jpeg_quality. Files the
+      // decoder cannot handle (arithmetic coding, odd component layouts) keep their original bytes.
       try {
         // The orientation (if any) is applied INSIDE this one decode+transpose+encode pass:
         // Pillow transposes the Pillow image, then saves once — double encoding would drift.
@@ -285,6 +297,9 @@ export class RasterImage {
         }
         this.imageData = reencodeExifJpeg(data, id, jpegQuality ?? 75, orientationToOps(orientation, op));
       } catch (error) {
+        // A truncated stream makes Pillow's re-save raise, so upstream drops the image; keep
+        // that hard failure. Other unsupported layouts fall back to the original bytes.
+        if (error instanceof ImageLoadingError) throw error;
         LOGGER.warning(`Could not re-save JPEG image '${id}', embedding the original: ${(error as Error).message}`);
       }
     }
@@ -306,8 +321,8 @@ export class RasterImage {
     }
     if (fullOps.length) {
       // A JPEG with a CSS angle (and no earlier exif/quality re-save) re-saves upstream too
-      // (image_data = none) — rotate inside the re-save; CMYK keeps its compressed bytes.
-      if (this.format === 'JPEG' && this.mode !== 'CMYK') {
+      // (image_data = none) — rotate inside the re-save.
+      if (this.format === 'JPEG') {
         try {
           let decoded = decodeJpegLibjpeg(this.imageData);
           let channels = decoded.channels ?? 3;
@@ -315,18 +330,20 @@ export class RasterImage {
           let width = decoded.width;
           let height = decoded.height;
           for (const op of fullOps) {
-            const mode = channels === 1 ? 'L' : 'RGB';
+            const mode = channels === 1 ? 'L' : channels === 4 ? 'CMYK' : 'RGB';
             const t = transposePixels(mode, pixels, width, height, op);
             pixels = t.data; width = t.width; height = t.height;
           }
           this.width = width;
           this.height = height;
           this.ratio = this.height !== 0 ? this.width / this.height : Infinity;
-          this.imageData = (channels === 1 ? encodeJpegGrayscale : encodeJpegLibjpeg)(pixels, width, height, jpegQuality ?? 75);
+          const encode = channels === 1 ? encodeJpegGrayscale : channels === 4 ? encodeJpegCmyk : encodeJpegLibjpeg;
+          this.imageData = encode(pixels, width, height, jpegQuality ?? 75);
         } catch (error) {
+          if (error instanceof JpegTruncatedError) throw new ImageLoadingError(error.message);
           LOGGER.warning(`Could not re-save JPEG image '${id}', embedding the original: ${(error as Error).message}`);
         }
-      } else if (this.format !== 'JPEG') {
+      } else {
         const decoded = this.decodePixels();
         for (const op of fullOps) {
           const t = transposePixels(decoded.mode, decoded.data, this.width, this.height, op);
@@ -426,13 +443,16 @@ export class RasterImage {
     // Upstream: --dpi downscales through Pillow's thumbnail() and embeds the result.
     let thumb: { data: Uint8Array; width: number; height: number } | null = null;
     let thumbJpeg: Uint8Array | null = null;
-    if (dpiRatio !== 1 && mode !== 'CMYK') {
-      const channels = { L: 1, LA: 2, RGB: 3, RGBA: 4 }[mode as 'L'] ?? 3;
+    if (dpiRatio !== 1) {
+      const channels = { L: 1, LA: 2, RGB: 3, RGBA: 4, CMYK: 4 }[mode as 'L'] ?? 3;
       const tw = Math.max(1, pyRound(width * dpiRatio)), th = Math.max(1, pyRound(height * dpiRatio));
       const source = this.format === 'JPEG' ? decodeJpegLibjpeg(this.imageData) : null;
       const t = thumbnail(source ? source.data : this.decodePixels().data, width, height, source ? (source.channels ?? 3) : channels, tw, th);
       width = t.width; height = t.height;
-      if (source) thumbJpeg = (source.channels === 1 ? encodeJpegGrayscale : encodeJpegLibjpeg)(t.data, t.width, t.height, 75);
+      if (source) {
+        const encode = source.channels === 1 ? encodeJpegGrayscale : source.channels === 4 ? encodeJpegCmyk : encodeJpegLibjpeg;
+        thumbJpeg = encode(t.data, t.width, t.height, 75);
+      }
       else thumb = t;
     }
     const colorSpace = mode === 'RGB' || mode === 'RGBA' ? '/DeviceRGB' : mode === 'L' || mode === 'LA' ? '/DeviceGray' : '/DeviceCMYK';
