@@ -3,6 +3,7 @@
 /** Style dictionaries (mirrors Style/InitialStyle/AnonymousStyle/ComputedStyle in css/__init__.py). */
 import { LOGGER } from '../logger.ts';
 import { COMPUTER_FUNCTIONS } from './computed_values.ts';
+import { PHYSICAL_FUNCTIONS } from './logical.ts';
 import { INHERITED, INITIAL_NOT_COMPUTED, INITIAL_VALUES } from './properties.ts';
 import { InvalidValues, isMath, removeWhitespace, splitOnComma } from './tokens.ts';
 import { Pending, validateNonShorthand } from './validation/properties.ts';
@@ -292,6 +293,19 @@ export class ComputedStyle extends Style {
       pending = false;
     }
     void weight;
+
+    // Logical properties: a cascaded logical longhand wins over the physical
+    // one when its weight is at least as high (Style.__missing__).
+    const logicalFunction = PHYSICAL_FUNCTIONS[key];
+    if (logicalFunction) {
+      const logicalKey = logicalFunction('ttb', this.get('direction') as string);
+      const logicalEntry = this.cascaded.get(logicalKey);
+      if (logicalEntry && weightCmp(logicalEntry[1], weight) >= 0) {
+        value = logicalEntry[0];
+        weight = logicalEntry[1];
+        pending = value instanceof Pending;
+      }
+    }
 
     if (value === 'inherit' && parentStyle === null) value = 'initial';
 
