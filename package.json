@@ -25,12 +25,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/aceitw/weasyprint-ts.git"
+    "url": "git+https://github.com/formprov/weasyprint-ts.git"
   },
   "bugs": {
-    "url": "https://github.com/aceitw/weasyprint-ts/issues"
+    "url": "https://github.com/formprov/weasyprint-ts/issues"
   },
-  "homepage": "https://github.com/aceitw/weasyprint-ts#readme",
+  "homepage": "https://github.com/formprov/weasyprint-ts#readme",
   "engines": {
     "node": ">=20"
   },
