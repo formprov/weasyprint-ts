@@ -38,8 +38,8 @@ Node 22.18+, and Python with Pillow. `UPSTREAM_DIR` names the v70.0 checkout the
 | Full run + regression guard | `python3 parity/upstream_diff.py parity/upstream-cases --baseline parity/upstream-baseline.json` (exit 1 on regression) |
 | Refresh baseline (FULL run only, after your cases pass) | add `--update-baseline` |
 | Official samples (must stay all **A**) | `python3 parity/run_samples.py` (writes the viewer at `parity/samples-out/out/side_by_side.html`) |
-| Unit/parity tests | `npm test` (18 pass, 1 known fail: `parity: text-basic.html`, 64 px — pre-existing) |
-| Typecheck | `npx tsc --noEmit -p tsconfig.json` (6 known errors: column.ts, svg.ts x2, hyphenator.ts x3 — do not add new ones) |
+| Unit/parity tests | `npm test` (all pass) |
+| Typecheck | `npx tsc --noEmit -p tsconfig.json` (clean; do not add errors) |
 
 Case names look like `AREA__FILE__TEST__N` (e.g. `layout__layout_test_grid__test_grid_single_item__1`); `--pattern`
 is a regex searched in that name. Failing pixel cases leave `parity/upstream-out/diff/NAME.png`

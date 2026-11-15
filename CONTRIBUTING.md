@@ -41,7 +41,7 @@ npx tsc --noEmit     # must be clean
 npm test             # includes the parity corpus (skips gracefully without ghostscript)
 ```
 
-Requires Node 26+ (the source runs directly via type stripping).
+Requires Node 22.18+ (the source runs directly via type stripping). CI runs Node 26.
 
 ## The parity corpus
 
@@ -57,7 +57,7 @@ If your change alters rendering:
    justification in the commit message.
 2. If you're *fixing* a gap (e.g. complex-script shaping), add a corpus
    document that demonstrates the fix and regenerate its expected PDF with
-   the reference environment (documented in the comparison-tool workspace).
+   the reference environment (documented in `parity/README.md`).
 
 ## Pull requests
 

@@ -26,14 +26,14 @@ docker build -t weasy-alpine-prod -f parity/docker/alpine-prod-Dockerfile parity
 # One document: both engines, both PDFs kept, an HTML report with the pages
 # side by side and a pixel-diff badge.
 python3 parity/side_by_side.py examples/flyer.html --docker
-open examples/sbs-flyer/side_by_side.html
+# then open examples/sbs-flyer/side_by_side.html in a browser
 
 # The repo corpus: page counts, pixels, and layout box trees.
 python3 parity/diffrun.py test/corpus --docker --layout
 
 # The acceptance page: 8 official samples + the repo corpus.
 python3 parity/acceptance.py --docker
-open parity/acceptance-out/index.html
+# then open parity/acceptance-out/index.html in a browser
 ```
 
 `side_by_side.py` writes the raw renders next to the report, for example
