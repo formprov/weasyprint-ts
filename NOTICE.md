@@ -7,6 +7,8 @@ engine by Kozea and contributors.
 
 * Upstream project: https://github.com/Kozea/WeasyPrint
 * Upstream version ported: 70.0 (see `UPSTREAM.md`)
+* Upstream copyright: Copyright (c) 2011-2021, Simon Sapin and
+  contributors. The notice is reproduced in `LICENSE`.
 * Upstream license: BSD-3-Clause. This port is distributed under the same
   BSD-3-Clause license (see `LICENSE`); the natural choice for a file-by-file
   derivative work, and the one upstream's own terms permit with the fewest
